@@ -109,6 +109,28 @@ function Sim1A() {
         return [ex, ey]
       }
 
+      // Voltage "glow": fill a small low-res buffer (one cell per few real
+      // pixels) and scale it up with the browser's own image smoothing, so
+      // the field tint reads as a soft gradient instead of a blocky grid.
+      let heatBuf
+      const HEAT_SCALE = 6
+      function drawHeatmap() {
+        heatBuf.clear()
+        const bw = heatBuf.width, bh = heatBuf.height
+        heatBuf.noStroke()
+        for (let bx = 0; bx < bw; bx++) {
+          for (let by = 0; by < bh; by++) {
+            const x = (bx + 0.5) * HEAT_SCALE, y = (by + 0.5) * HEAT_SCALE
+            const v = volt(x, y)
+            const c = Math.max(-1, Math.min(1, v / 2800))
+            if (c > 0) heatBuf.fill(59, 130, 246, c * 80)
+            else heatBuf.fill(245, 158, 11, -c * 80)
+            heatBuf.rect(bx, by, 1, 1)
+          }
+        }
+        p.image(heatBuf, 0, 0, W, H)
+      }
+
       function chargeAt(x, y) {
         for (let i = charges.length - 1; i >= 0; i--)
           if (Math.hypot(x - charges[i].x, y - charges[i].y) < CR + 5) return i
@@ -297,12 +319,26 @@ function Sim1A() {
       p.setup = () => {
         const cnv = p.createCanvas(W, H)
         cnv.elt.addEventListener('contextmenu', e => e.preventDefault())
+        cnv.elt.style.width = '100%'
+        cnv.elt.style.height = 'auto'
+        cnv.elt.style.display = 'block'
+        // Backing buffer must have enough real pixels for the CSS-stretched
+        // display size (plus device pixel ratio) or the upscale looks blurry.
+        const rectW = cnv.elt.getBoundingClientRect().width || W
+        const density = Math.min(3, Math.max(1, rectW / W) * (window.devicePixelRatio || 1))
+        p.pixelDensity(density)
+        cnv.elt.style.width = '100%'
+        cnv.elt.style.height = 'auto'
+        cnv.elt.style.display = 'block'
         p.textFont('monospace')
+        heatBuf = p.createGraphics(Math.ceil(W / HEAT_SCALE), Math.ceil(H / HEAT_SCALE))
         if (cancelled) p.remove()
       }
 
       p.draw = () => {
         p.background(15, 20, 30)
+
+        drawHeatmap()
 
         // Field lines + equipotentials (skip during drag for performance)
         if (dragging === null) {
@@ -368,7 +404,7 @@ function Sim1B() {
   const containerRef = useRef()
 
   useEffect(() => {
-    const W = 480, H = 280, K = 50000, SEP = 72
+    const W = 720, H = 420, K = 50000, SEP = 108
     let cancelled = false
 
     const sketch = (p) => {
@@ -386,10 +422,32 @@ function Sim1B() {
         return K * (1 / rp - 1 / rn)
       }
 
-      function arrow(x1, y1, x2, y2, r, g, b, a = 220, sw = 2.5) {
+      // Voltage "glow": fill a small low-res buffer (one cell per few real
+      // pixels) and scale it up with the browser's own image smoothing, so
+      // the field tint reads as a soft gradient instead of a blocky grid.
+      let heatBuf
+      const HEAT_SCALE = 6
+      function drawHeatmap() {
+        heatBuf.clear()
+        const bw = heatBuf.width, bh = heatBuf.height
+        heatBuf.noStroke()
+        for (let bx = 0; bx < bw; bx++) {
+          for (let by = 0; by < bh; by++) {
+            const x = (bx + 0.5) * HEAT_SCALE, y = (by + 0.5) * HEAT_SCALE
+            const v = volt(x, y)
+            const c = Math.max(-1, Math.min(1, v / 1800))
+            if (c > 0) heatBuf.fill(59, 130, 246, c * 80)
+            else heatBuf.fill(245, 158, 11, -c * 80)
+            heatBuf.rect(bx, by, 1, 1)
+          }
+        }
+        p.image(heatBuf, 0, 0, W, H)
+      }
+
+      function arrow(x1, y1, x2, y2, r, g, b, a = 220, sw = 3) {
         p.stroke(r, g, b, a); p.strokeWeight(sw)
         p.line(x1, y1, x2, y2)
-        const ang = Math.atan2(y2 - y1, x2 - x1), hs = 11
+        const ang = Math.atan2(y2 - y1, x2 - x1), hs = 13
         p.fill(r, g, b, a); p.noStroke()
         p.triangle(x2, y2,
           x2 - hs * Math.cos(ang - 0.42), y2 - hs * Math.sin(ang - 0.42),
@@ -397,68 +455,74 @@ function Sim1B() {
       }
 
       function drawCharge(x, y, positive) {
-        const R = 13
-        p.strokeWeight(2)
+        const R = 15
+        p.strokeWeight(2.5)
         if (positive) { p.stroke(100, 160, 255); p.fill(59, 130, 246) }
         else { p.stroke(255, 180, 60); p.fill(245, 158, 11) }
         p.circle(x, y, R * 2)
         p.fill(255); p.noStroke()
-        p.textAlign(p.CENTER, p.CENTER); p.textSize(15)
+        p.textAlign(p.CENTER, p.CENTER); p.textSize(17)
         p.text(positive ? '+' : '−', x, y)
       }
 
-      p.setup = () => { p.createCanvas(W, H); p.textFont('monospace'); if (cancelled) p.remove() }
+      p.setup = () => {
+        const cnv = p.createCanvas(W, H)
+        cnv.elt.style.width = '100%'
+        cnv.elt.style.height = 'auto'
+        cnv.elt.style.display = 'block'
+        // Backing buffer must have enough real pixels for the CSS-stretched
+        // display size (plus device pixel ratio) or the upscale looks blurry.
+        const rectW = cnv.elt.getBoundingClientRect().width || W
+        const density = Math.min(3, Math.max(1, rectW / W) * (window.devicePixelRatio || 1))
+        p.pixelDensity(density)
+        cnv.elt.style.width = '100%'
+        cnv.elt.style.height = 'auto'
+        cnv.elt.style.display = 'block'
+        p.textFont('monospace')
+        heatBuf = p.createGraphics(Math.ceil(W / HEAT_SCALE), Math.ceil(H / HEAT_SCALE))
+        if (cancelled) p.remove()
+      }
 
       p.draw = () => {
         p.background(15, 20, 30)
 
-        // Voltage heatmap
-        const gs = 7; p.noStroke()
-        for (let x = 0; x < W; x += gs) {
-          for (let y = 0; y < H; y += gs) {
-            const v = volt(x + gs / 2, y + gs / 2)
-            const c = Math.max(-1, Math.min(1, v / 1800))
-            if (c > 0) p.fill(59, 130, 246, c * 80)
-            else p.fill(245, 158, 11, -c * 80)
-            p.rect(x, y, gs, gs)
-          }
-        }
+        drawHeatmap()
 
         const { x: px, y: py } = posC(), { x: nx, y: ny } = negC()
 
         // Dipole moment arrow (neg → pos)
-        arrow(nx, ny, px, py, 255, 255, 255, 210, 2.5)
+        arrow(nx, ny, px, py, 255, 255, 255, 210, 3)
 
         // p⃗ label
         p.fill(255, 255, 255, 170); p.noStroke()
-        p.textAlign(p.LEFT, p.BOTTOM); p.textSize(12)
+        p.textAlign(p.LEFT, p.BOTTOM); p.textSize(13)
         const la = angle - Math.PI / 2
-        p.text('p⃗', px + 14 * Math.cos(la), py + 14 * Math.sin(la))
+        p.text('p⃗', px + 16 * Math.cos(la), py + 16 * Math.sin(la))
 
         drawCharge(px, py, true)
         drawCharge(nx, ny, false)
 
         // Test point
         const tv = volt(testPt.x, testPt.y)
-        p.fill(52, 211, 153); p.stroke(52, 211, 153, 200); p.strokeWeight(1.5)
-        p.circle(testPt.x, testPt.y, 10)
+        p.fill(52, 211, 153); p.stroke(52, 211, 153, 200); p.strokeWeight(1.8)
+        p.circle(testPt.x, testPt.y, 12)
         const lbl = `V = ${tv.toFixed(0)}`
-        const lw = lbl.length * 6.6 + 8
+        const lw = lbl.length * 7.2 + 9
         p.fill(15, 20, 30, 200); p.noStroke()
-        p.rect(testPt.x + 8, testPt.y - 8, lw, 15, 3)
-        p.fill(52, 211, 153); p.textAlign(p.LEFT, p.CENTER); p.textSize(11)
-        p.text(lbl, testPt.x + 10, testPt.y)
+        p.rect(testPt.x + 9, testPt.y - 9, lw, 17, 3.5)
+        p.fill(52, 211, 153); p.textAlign(p.LEFT, p.CENTER); p.textSize(12)
+        p.text(lbl, testPt.x + 11, testPt.y)
 
         // Instructions
         p.fill(255, 255, 255, 65); p.noStroke()
-        p.textAlign(p.LEFT, p.TOP); p.textSize(10)
-        p.text('Drag center region to rotate · Drag green dot to measure V', 8, 8)
+        p.textAlign(p.LEFT, p.TOP); p.textSize(11)
+        p.text('Drag center region to rotate · Drag green dot to measure V', 9, 9)
       }
 
       p.mousePressed = () => {
         if (p.mouseX < 0 || p.mouseX > W || p.mouseY < 0 || p.mouseY > H) return
-        if (Math.hypot(p.mouseX - testPt.x, p.mouseY - testPt.y) < 12) { dragTest = true; return }
-        if (Math.hypot(p.mouseX - W / 2, p.mouseY - H / 2) < 100) dragDipole = true
+        if (Math.hypot(p.mouseX - testPt.x, p.mouseY - testPt.y) < 14) { dragTest = true; return }
+        if (Math.hypot(p.mouseX - W / 2, p.mouseY - H / 2) < 115) dragDipole = true
       }
       p.mouseDragged = () => {
         if (dragTest) { testPt.x = p.mouseX; testPt.y = p.mouseY; return }
@@ -480,106 +544,429 @@ function Sim1B() {
   )
 }
 
-// ── 1C: Voltage difference between two probe points ───────────────────────────
-function Sim1C() {
-  const containerRef = useRef()
-  const sepRef = useRef(80)
-  const [sep, setSep] = useState(80)
+// ── 1D: A row of cells depolarizing/repolarizing generates a dipole ───────────
+function PlayIcon()  { return <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> }
+function PauseIcon() { return <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg> }
+const CELL_SPEEDS = [0.25, 0.5, 1, 1.5, 2]
 
-  useEffect(() => { sepRef.current = sep }, [sep])
+function Sim1DCells() {
+  const containerRef = useRef()
+
+  const [playing, setPlaying] = useState(true)
+  const [speed, setSpeed] = useState(1)
+  const [showField, setShowField] = useState(false)
+  const [showEq, setShowEq] = useState(false)
+  const [showCurrent, setShowCurrent] = useState(false)
+
+  const playingRef = useRef(playing)
+  const speedRef = useRef(speed)
+  const showFieldRef = useRef(showField)
+  const showEqRef = useRef(showEq)
+  const showCurrentRef = useRef(showCurrent)
+  useEffect(() => { playingRef.current = playing }, [playing])
+  useEffect(() => { speedRef.current = speed }, [speed])
+  useEffect(() => { showFieldRef.current = showField }, [showField])
+  useEffect(() => { showEqRef.current = showEq }, [showEq])
+  useEffect(() => { showCurrentRef.current = showCurrent }, [showCurrent])
 
   useEffect(() => {
-    const W = 480, H = 280, K = 42000, PR = 9
+    const W = 720, H = 480, K = 38000
+    const N = 10
+    const QMAX = 1
+    const MARGIN_X = 70, GAP = 8
+    const CELL_W = (W - 2 * MARGIN_X - (N - 1) * GAP) / N
+    const CELL_H = 60
+    const ROW_Y = H * 0.54
+    const CX = W / 2
+
+    // Timing (ms, pre speed-scaling)
+    const STEP_DELAY = 90
+    const TRANS_DUR = 60
+    const APD = 260
+    const REST_PAUSE = 500
+    const lastRepolEnd = (N - 1) * STEP_DELAY + 2 * TRANS_DUR + APD
+    const TOTAL_CYCLE = lastRepolEnd + REST_PAUSE
+
     let cancelled = false
 
     const sketch = (p) => {
-      let probeA = { x: W / 2 - 90, y: H / 2 - 65 }
-      let probeB = { x: W / 2 + 90, y: H / 2 + 65 }
+      const xs = Array.from({ length: N }, (_, i) => MARGIN_X + CELL_W / 2 + i * (CELL_W + GAP))
+      const simTimeRef = { current: 0 }
+      let lastMaxP = 1
+
+      // Two draggable probes — the actual "electrodes" reading the voltage
+      // this changing charge distribution produces, so ΔV isn't an
+      // unexplained number: it's V(A) − V(B) measured at two real points.
+      const PR = 9
+      let probeA = { x: xs[0] - 40, y: ROW_Y - CELL_H / 2 - 32 }
+      let probeB = { x: xs[N - 1] + 40, y: ROW_Y - CELL_H / 2 - 32 }
       let dragA = false, dragB = false
 
-      function volt(x, y) {
-        const s = sepRef.current
-        const r1 = Math.max(Math.hypot(x - (W / 2 + s / 2), y - H / 2), 8)
-        const r2 = Math.max(Math.hypot(x - (W / 2 - s / 2), y - H / 2), 8)
-        return K * (1 / r1 - 1 / r2)
+      function smooth(f) { return f * f * (3 - 2 * f) }
+
+      // State of cell i at time t: +1 = resting (polarized), −1 = depolarized.
+      function sAt(i, t) {
+        const ti = i * STEP_DELAY
+        const depolEnd = ti + TRANS_DUR
+        const repolStart = depolEnd + APD
+        const repolEnd = repolStart + TRANS_DUR
+        if (t < ti) return 1
+        if (t < depolEnd) return 1 - 2 * smooth((t - ti) / TRANS_DUR)
+        if (t < repolStart) return -1
+        if (t < repolEnd) return -1 + 2 * smooth((t - repolStart) / TRANS_DUR)
+        return 1
       }
 
-      p.setup = () => { p.createCanvas(W, H); p.textFont('monospace'); if (cancelled) p.remove() }
+      const lastDepolEnd = (N - 1) * STEP_DELAY + TRANS_DUR
+      function phaseName(t) {
+        if (t < lastDepolEnd) return 'depolarizing'
+        if (t < lastRepolEnd) return 'repolarizing'
+        return 'resting'
+      }
 
-      p.draw = () => {
-        p.background(15, 20, 30)
-        const s = sepRef.current
-        const px = W / 2 + s / 2, nx = W / 2 - s / 2
+      function chargesAt(t) {
+        return xs.map((x, i) => ({ x, y: ROW_Y, q: sAt(i, t) * QMAX }))
+      }
 
-        // Voltage heatmap
-        const gs = 7; p.noStroke()
-        for (let x = 0; x < W; x += gs) {
-          for (let y = 0; y < H; y += gs) {
-            const v = volt(x + gs / 2, y + gs / 2)
-            const c = Math.max(-1, Math.min(1, v / 2200))
-            if (c > 0) p.fill(59, 130, 246, c * 80)
-            else p.fill(245, 158, 11, -c * 80)
-            p.rect(x, y, gs, gs)
+      function netDipole(t) {
+        const cs = chargesAt(t)
+        let p2 = 0
+        for (const c of cs) p2 += c.q * (c.x - CX)
+        return p2
+      }
+
+      // Sample the whole cycle once to normalize the arrow/strip-chart scale.
+      function computeMaxP() {
+        let m = 1e-6
+        for (let t = 0; t < TOTAL_CYCLE; t += 10) m = Math.max(m, Math.abs(netDipole(t)))
+        return m
+      }
+
+      function volt(x, y, cs) {
+        let v = 0
+        for (const c of cs) {
+          const r = Math.max(Math.hypot(x - c.x, y - c.y), 8)
+          v += K * c.q / r
+        }
+        return v
+      }
+
+      function fld(x, y, cs) {
+        let ex = 0, ey = 0
+        for (const c of cs) {
+          const dx = x - c.x, dy = y - c.y
+          const r2 = Math.max(dx * dx + dy * dy, 64), r = Math.sqrt(r2)
+          const f = K * c.q / (r2 * r)
+          ex += f * dx; ey += f * dy
+        }
+        return [ex, ey]
+      }
+
+      const CR = 6
+      function traceField(sx, sy, source, cs) {
+        const pts = [[sx, sy]]
+        let x = sx, y = sy
+        const sign = source.q > 0 ? 1 : -1
+        const hasOpposite = cs.some(c => Math.sign(c.q) !== Math.sign(source.q) && Math.abs(c.q) > 0.05)
+        const maxSteps = hasOpposite ? 500 : 200
+        for (let i = 0; i < maxSteps; i++) {
+          const [ex, ey] = fld(x, y, cs)
+          const m = Math.hypot(ex, ey)
+          if (m < 1e-6) break
+          if (!hasOpposite && m < 0.03) break
+          x += sign * 3 * ex / m; y += sign * 3 * ey / m
+          let stop = false
+          for (const c of cs) {
+            if (c === source) continue
+            if (Math.sign(c.q) !== Math.sign(source.q) && Math.abs(c.q) > 0.05 && Math.hypot(x - c.x, y - c.y) < CR + 7) { stop = true; break }
+          }
+          pts.push([x, y])
+          if (stop) break
+        }
+        return pts
+      }
+
+      function traceAllLines(cs) {
+        const positives = cs.filter(c => c.q > 0.05)
+        const sources = positives.length > 0 ? positives : cs.filter(c => c.q < -0.05)
+        const lines = []
+        if (sources.length === 0) return lines
+        const nSeeds = Math.max(2, Math.min(6, Math.floor(40 / sources.length)))
+        for (const src of sources) {
+          for (let k = 0; k < nSeeds; k++) {
+            const a = (k / nSeeds) * Math.PI * 2
+            const pts = traceField(src.x + (CR + 5) * Math.cos(a), src.y + (CR + 5) * Math.sin(a), src, cs)
+            if (pts.length > 1) lines.push(src.q < 0 ? pts.slice().reverse() : pts)
           }
         }
+        return lines
+      }
 
-        // Conductor body
-        const bw = s + 60, bh = 32
-        p.fill(28, 38, 52); p.stroke(70, 95, 120); p.strokeWeight(1.5)
-        p.rect(W / 2 - bw / 2, H / 2 - bh / 2, bw, bh, 5)
+      function drawArrowheads(pts, alpha) {
+        const everyN = Math.max(1, Math.round(70 / 3))
+        for (let idx = everyN; idx < pts.length; idx += everyN) {
+          const [x0, y0] = pts[idx - 1], [x1, y1] = pts[idx]
+          const ang = Math.atan2(y1 - y0, x1 - x0), len = 5
+          p.push()
+          p.translate(x1, y1); p.rotate(ang)
+          p.noStroke(); p.fill(80, 140, 255, alpha)
+          p.triangle(0, 0, -len, len * 0.5, -len, -len * 0.5)
+          p.pop()
+        }
+      }
 
-        // Charge symbols inside conductor
-        p.noStroke(); p.textAlign(p.CENTER, p.CENTER); p.textSize(12)
-        p.fill(59, 130, 246)
-        for (let i = -1; i <= 1; i++) p.text('+', px + i * 12, H / 2)
-        p.fill(245, 158, 11)
-        for (let i = -1; i <= 1; i++) p.text('−', nx + i * 12, H / 2)
+      function drawFieldLines(lines) {
+        p.noFill(); p.stroke(80, 140, 255, 150); p.strokeWeight(1.3)
+        for (const pts of lines) {
+          p.beginShape()
+          pts.forEach(([px, py]) => p.vertex(px, py))
+          p.endShape()
+          drawArrowheads(pts, 180)
+        }
+      }
 
-        // Probe lead wires (dashed)
-        p.strokeWeight(1)
-        p.stroke(52, 211, 153, 70); p.drawingContext.setLineDash([4, 3])
-        p.line(probeA.x, probeA.y, probeA.x, H / 2)
-        p.stroke(168, 85, 247, 70)
-        p.line(probeB.x, probeB.y, probeB.x, H / 2)
+      function drawCurrentLines(lines) {
+        p.push()
+        p.noFill(); p.stroke(52, 211, 153, 200); p.strokeWeight(1.6)
+        p.drawingContext.setLineDash([6, 7])
+        p.drawingContext.lineDashOffset = -(p.frameCount * 0.6) % 13
+        for (const pts of lines) {
+          p.beginShape()
+          pts.forEach(([px, py]) => p.vertex(px, py))
+          p.endShape()
+        }
+        p.drawingContext.setLineDash([])
+        p.pop()
+      }
+
+      // ── Equipotentials: marching squares over a per-frame voltage grid ──
+      const gsEq = 8, cols = Math.round(W / gsEq), rows = Math.round(H / gsEq)
+      const cornerV = new Float32Array((cols + 1) * (rows + 1))
+
+      function computeCornerGrid(cs) {
+        for (let j = 0; j <= rows; j++)
+          for (let i = 0; i <= cols; i++)
+            cornerV[j * (cols + 1) + i] = volt(i * gsEq, j * gsEq, cs)
+      }
+      const V = (i, j) => cornerV[j * (cols + 1) + i]
+
+      function pickLevels(cs) {
+        let maxV = 0
+        const step = 24
+        for (let x = step / 2; x < W; x += step) {
+          for (let y = step / 2; y < H; y += step) {
+            let near = false
+            for (const c of cs) if (Math.hypot(x - c.x, y - c.y) < CR * 3) { near = true; break }
+            if (near) continue
+            maxV = Math.max(maxV, Math.abs(volt(x, y, cs)))
+          }
+        }
+        if (maxV < 1) return []
+        const N2 = 6, levels = []
+        const lo = maxV * 0.1, hi = maxV * 0.55
+        for (let i = 0; i < N2; i++) {
+          const t = i / (N2 - 1)
+          const v = lo * Math.pow(hi / lo, t)
+          levels.push(v, -v)
+        }
+        return levels
+      }
+
+      function lerpPt(va, vb, pa, pb, level) {
+        const t = (level - va) / (vb - va)
+        return [pa[0] + t * (pb[0] - pa[0]), pa[1] + t * (pb[1] - pa[1])]
+      }
+
+      function drawContour(level) {
+        for (let j = 0; j < rows; j++) {
+          for (let i = 0; i < cols; i++) {
+            const x0 = i * gsEq, y0 = j * gsEq
+            const v00 = V(i, j), v10 = V(i + 1, j), v11 = V(i + 1, j + 1), v01 = V(i, j + 1)
+            const above = [v00 > level, v10 > level, v11 > level, v01 > level]
+            if (above[0] === above[1] && above[1] === above[2] && above[2] === above[3]) continue
+            const cTL = [x0, y0], cTR = [x0 + gsEq, y0], cBR = [x0 + gsEq, y0 + gsEq], cBL = [x0, y0 + gsEq]
+            const crosses = []
+            if (above[0] !== above[1]) crosses.push(lerpPt(v00, v10, cTL, cTR, level))
+            if (above[1] !== above[2]) crosses.push(lerpPt(v10, v11, cTR, cBR, level))
+            if (above[2] !== above[3]) crosses.push(lerpPt(v01, v11, cBL, cBR, level))
+            if (above[3] !== above[0]) crosses.push(lerpPt(v00, v01, cTL, cBL, level))
+            if (crosses.length === 2) {
+              p.line(crosses[0][0], crosses[0][1], crosses[1][0], crosses[1][1])
+            } else if (crosses.length === 4) {
+              if (above[0]) {
+                p.line(crosses[0][0], crosses[0][1], crosses[3][0], crosses[3][1])
+                p.line(crosses[1][0], crosses[1][1], crosses[2][0], crosses[2][1])
+              } else {
+                p.line(crosses[0][0], crosses[0][1], crosses[1][0], crosses[1][1])
+                p.line(crosses[2][0], crosses[2][1], crosses[3][0], crosses[3][1])
+              }
+            }
+          }
+        }
+      }
+
+      function drawEquipotentials(cs) {
+        computeCornerGrid(cs)
+        const levels = pickLevels(cs)
+        p.stroke(110, 220, 140, 150); p.strokeWeight(1)
+        for (const level of levels) drawContour(level)
+      }
+
+      function lerpColor(a, b, t) {
+        return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+      }
+
+      function drawCell(i, x, s, transitioning, transitionSign) {
+        const AMBER = [245, 158, 11], BLUE = [59, 130, 246]
+        const [r, g, b] = lerpColor(AMBER, BLUE, (s + 1) / 2)
+        if (transitioning) {
+          p.drawingContext.shadowBlur = 14
+          p.drawingContext.shadowColor = transitionSign > 0 ? 'rgba(129,140,248,0.9)' : 'rgba(253,224,71,0.9)'
+        }
+        p.fill(r, g, b); p.stroke(255, 255, 255, 60); p.strokeWeight(1.2)
+        p.rectMode(p.CENTER)
+        p.rect(x, ROW_Y, CELL_W, CELL_H, 8)
+        p.drawingContext.shadowBlur = 0
+        p.rectMode(p.CORNER)
+
+        p.noStroke(); p.textAlign(p.CENTER, p.CENTER); p.textSize(13)
+        if (s > 0.35) {
+          p.fill(255, 255, 255, 220)
+          p.text('+', x, ROW_Y - CELL_H / 2 - 12)
+          p.text('+', x, ROW_Y + CELL_H / 2 + 12)
+        } else if (s < -0.35) {
+          p.fill(255, 255, 255, 220)
+          p.text('−', x, ROW_Y - CELL_H / 2 - 12)
+          p.text('−', x, ROW_Y + CELL_H / 2 + 12)
+        }
+      }
+
+      function arrow(x1, y1, x2, y2, r, g, b, a = 220, sw = 3) {
+        p.stroke(r, g, b, a); p.strokeWeight(sw)
+        p.line(x1, y1, x2, y2)
+        const ang = Math.atan2(y2 - y1, x2 - x1), hs = 11
+        p.fill(r, g, b, a); p.noStroke()
+        p.triangle(x2, y2,
+          x2 - hs * Math.cos(ang - 0.42), y2 - hs * Math.sin(ang - 0.42),
+          x2 - hs * Math.cos(ang + 0.42), y2 - hs * Math.sin(ang + 0.42))
+      }
+
+      p.setup = () => {
+        const cnv = p.createCanvas(W, H)
+        cnv.elt.style.width = '100%'
+        cnv.elt.style.height = 'auto'
+        cnv.elt.style.display = 'block'
+        const rectW = cnv.elt.getBoundingClientRect().width || W
+        const density = Math.min(3, Math.max(1, rectW / W) * (window.devicePixelRatio || 1))
+        p.pixelDensity(density)
+        cnv.elt.style.width = '100%'
+        cnv.elt.style.height = 'auto'
+        cnv.elt.style.display = 'block'
+        p.textFont('monospace')
+        lastMaxP = computeMaxP()
+        if (cancelled) p.remove()
+      }
+
+      p.draw = () => {
+        if (playingRef.current) simTimeRef.current += p.deltaTime * speedRef.current
+        const t = simTimeRef.current % TOTAL_CYCLE
+
+        p.background(15, 20, 30)
+
+        const cs = chargesAt(t)
+        const needsLines = showFieldRef.current || showCurrentRef.current
+        const lines = needsLines ? traceAllLines(cs) : []
+        if (showFieldRef.current) drawFieldLines(lines)
+        if (showCurrentRef.current) drawCurrentLines(lines)
+        if (showEqRef.current) drawEquipotentials(cs)
+
+        // Cells
+        for (let i = 0; i < N; i++) {
+          const ti = i * STEP_DELAY, depolEnd = ti + TRANS_DUR
+          const repolStart = depolEnd + APD, repolEnd = repolStart + TRANS_DUR
+          const s = sAt(i, t)
+          const transitioning = (t >= ti && t < depolEnd) || (t >= repolStart && t < repolEnd)
+          const transitionSign = (t >= repolStart && t < repolEnd) ? 1 : -1
+          drawCell(i, xs[i], s, transitioning, transitionSign)
+        }
+
+        // Probes — actual electrode voltage readout, driving ΔV
+        const vA = volt(probeA.x, probeA.y, cs)
+        const vB = volt(probeB.x, probeB.y, cs)
+        const dv = vA - vB
+
+        p.strokeWeight(1); p.stroke(150, 150, 150, 70)
+        p.drawingContext.setLineDash([4, 3])
+        p.line(probeA.x, probeA.y, probeB.x, probeB.y)
         p.drawingContext.setLineDash([])
 
-        // Probe A (teal)
         p.fill(52, 211, 153); p.stroke(52, 211, 153, 180); p.strokeWeight(2)
         p.circle(probeA.x, probeA.y, PR * 2)
-        // Probe B (purple)
         p.fill(168, 85, 247); p.stroke(168, 85, 247, 180)
         p.circle(probeB.x, probeB.y, PR * 2)
 
-        // Labels
-        p.noStroke()
-        p.fill(52, 211, 153, 180); p.textAlign(p.CENTER, p.TOP); p.textSize(10)
-        p.text('A', probeA.x, probeA.y + PR + 3)
-        p.fill(168, 85, 247, 180)
-        p.text('B', probeB.x, probeB.y + PR + 3)
+        p.noStroke(); p.textAlign(p.CENTER, p.BOTTOM); p.textSize(10)
+        p.fill(52, 211, 153, 220)
+        p.text(`A  ${vA.toFixed(0)}`, probeA.x, probeA.y - PR - 3)
+        p.fill(168, 85, 247, 220)
+        p.text(`B  ${vB.toFixed(0)}`, probeB.x, probeB.y - PR - 3)
 
-        // ΔV display
-        const vA = volt(probeA.x, probeA.y)
-        const vB = volt(probeB.x, probeB.y)
-        const dv = vA - vB
+        // Net dipole vector, drawn above the row
+        const pNow = netDipole(t)
+        const norm = Math.max(-1, Math.min(1, pNow / lastMaxP))
+        const arrowY = ROW_Y - CELL_H / 2 - 55
+        const maxLen = 130
+        p.stroke(255, 255, 255, 40); p.strokeWeight(1)
+        p.line(CX - maxLen, arrowY, CX + maxLen, arrowY)
+        if (Math.abs(norm) > 0.02) {
+          arrow(CX, arrowY, CX + norm * maxLen, arrowY, 52, 211, 153, 230, 3)
+        }
+        p.fill(52, 211, 153, 180); p.noStroke()
+        p.textAlign(p.CENTER, p.BOTTOM); p.textSize(11)
+        p.text('net dipole p(t)', CX, arrowY - 10)
 
+        // Info panel
         p.fill(15, 20, 30, 210); p.noStroke()
-        p.rect(8, 8, 210, 68, 6)
+        p.rect(9, 9, 190, 58, 7)
         p.textAlign(p.LEFT, p.TOP); p.textSize(11)
-        p.fill(52, 211, 153); p.text(`V(A) = ${vA.toFixed(0)}`, 16, 16)
-        p.fill(168, 85, 247); p.text(`V(B) = ${vB.toFixed(0)}`, 16, 30)
-        p.fill(255, 255, 255, 210); p.text(`ΔV  = ${dv.toFixed(0)}`, 16, 44)
-        p.fill(150, 150, 150, 100); p.textSize(9)
-        p.text('(what the ECG records)', 16, 58)
+        p.fill(255, 255, 255, 210); p.text(`t = ${Math.round(t)} ms`, 18, 18)
+        p.fill(52, 211, 153, 200); p.text(`p(t) = ${pNow.toFixed(0)}`, 18, 34)
+        p.fill(150, 150, 150, 150); p.text(phaseName(t), 18, 50)
 
-        // Hint
-        p.fill(255, 255, 255, 60); p.textAlign(p.LEFT, p.BOTTOM); p.textSize(10)
-        p.text('Drag teal or purple probe to any position', 8, H - 6)
+        // Probe readout panel — V(A), V(B) and their difference
+        p.fill(15, 20, 30, 210); p.noStroke()
+        p.rect(9, H - 68, 190, 59, 7)
+        p.textAlign(p.LEFT, p.TOP); p.textSize(11)
+        p.fill(52, 211, 153, 220); p.text(`V(A) = ${vA.toFixed(0)}`, 18, H - 60)
+        p.fill(168, 85, 247, 220); p.text(`V(B) = ${vB.toFixed(0)}`, 18, H - 44)
+        p.fill(255, 255, 255, 210); p.text(`ΔV = ${dv.toFixed(0)}`, 18, H - 28)
+        p.fill(255, 255, 255, 60); p.textSize(9)
+        p.text('drag A/B to probe the field', 18, H - 14)
+
+        // Mini strip chart of p(t) over one full cycle
+        const chW = 190, chH = 60, chX = W - chW - 9, chY = 9
+        p.fill(15, 20, 30, 210); p.noStroke()
+        p.rect(chX, chY, chW, chH, 7)
+        p.stroke(255, 255, 255, 30); p.strokeWeight(1)
+        p.line(chX, chY + chH / 2, chX + chW, chY + chH / 2)
+        p.noFill(); p.stroke(52, 211, 153, 200); p.strokeWeight(1.5)
+        p.beginShape()
+        const steps = 60
+        for (let k = 0; k <= steps; k++) {
+          const ts = (k / steps) * TOTAL_CYCLE
+          const py = chY + chH / 2 - (netDipole(ts) / lastMaxP) * (chH / 2 - 4)
+          p.vertex(chX + (k / steps) * chW, py)
+        }
+        p.endShape()
+        const cursorX = chX + (t / TOTAL_CYCLE) * chW
+        p.stroke(255, 255, 255, 120); p.strokeWeight(1)
+        p.line(cursorX, chY, cursorX, chY + chH)
       }
 
       p.mousePressed = () => {
         if (p.mouseX < 0 || p.mouseX > W || p.mouseY < 0 || p.mouseY > H) return
-        if (Math.hypot(p.mouseX - probeA.x, p.mouseY - probeA.y) < PR + 5) { dragA = true; return }
-        if (Math.hypot(p.mouseX - probeB.x, p.mouseY - probeB.y) < PR + 5) dragB = true
+        if (Math.hypot(p.mouseX - probeA.x, p.mouseY - probeA.y) < PR + 6) { dragA = true; return }
+        if (Math.hypot(p.mouseX - probeB.x, p.mouseY - probeB.y) < PR + 6) dragB = true
       }
       p.mouseDragged = () => {
         if (dragA) { probeA.x = p.mouseX; probeA.y = p.mouseY }
@@ -595,13 +982,48 @@ function Sim1C() {
   return (
     <CanvasWrap containerRef={containerRef}>
       <SimBar>
-        <span className="shrink-0 text-gray-400">Charge separation</span>
-        <input
-          type="range" min="10" max="200" value={sep}
-          onChange={e => setSep(+e.target.value)}
-          className="flex-1 accent-teal-400"
-        />
-        <span className="shrink-0 font-mono text-gray-400 w-10 text-right">{sep}px</span>
+        <button
+          onClick={() => setPlaying(v => !v)}
+          className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+            playing ? 'bg-gray-800 text-gray-300 border-gray-700' : 'bg-emerald-950/60 text-emerald-300 border-emerald-700/50'
+          }`}
+        >
+          {playing ? <PauseIcon /> : <PlayIcon />}
+          {playing ? 'Pause' : 'Play'}
+        </button>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs uppercase tracking-widest text-gray-600 mr-0.5">Speed</span>
+          {CELL_SPEEDS.map((s) => (
+            <button
+              key={s}
+              onClick={() => setSpeed(s)}
+              className={`px-2 py-1 rounded-md text-xs font-mono border transition-colors ${
+                speed === s ? 'bg-indigo-950/60 text-indigo-300 border-indigo-700/50' : 'text-gray-500 border-gray-700 hover:text-gray-300'
+              }`}
+            >
+              {s}×
+            </button>
+          ))}
+        </div>
+        <div className="flex-1" />
+        <button
+          onClick={() => setShowField(v => !v)}
+          className={`shrink-0 px-3 py-1 rounded-full border text-xs transition-colors cursor-pointer ${showField ? 'bg-blue-900/50 border-blue-700 text-blue-300' : 'border-gray-700 text-gray-500 hover:text-gray-400'}`}
+        >
+          Field lines {showField ? 'ON' : 'OFF'}
+        </button>
+        <button
+          onClick={() => setShowEq(v => !v)}
+          className={`shrink-0 px-3 py-1 rounded-full border text-xs transition-colors cursor-pointer ${showEq ? 'bg-teal-900/50 border-teal-700 text-teal-300' : 'border-gray-700 text-gray-500 hover:text-gray-400'}`}
+        >
+          Equipotentials {showEq ? 'ON' : 'OFF'}
+        </button>
+        <button
+          onClick={() => setShowCurrent(v => !v)}
+          className={`shrink-0 px-3 py-1 rounded-full border text-xs transition-colors cursor-pointer ${showCurrent ? 'bg-emerald-900/50 border-emerald-700 text-emerald-300' : 'border-gray-700 text-gray-500 hover:text-gray-400'}`}
+        >
+          Current lines {showCurrent ? 'ON' : 'OFF'}
+        </button>
       </SimBar>
     </CanvasWrap>
   )
@@ -612,39 +1034,55 @@ function Sim1D() {
   const containerRef = useRef()
 
   useEffect(() => {
-    const W = 480, H = 300
+    const W = 720, H = 450
     const OX = W / 2, OY = H / 2
     let cancelled = false
 
     const sketch = (p) => {
-      let vecA = { x: 80, y: -60 }
-      let vecB = { x: 115, y: 28 }
+      let vecA = { x: 96, y: -72 }
+      let vecB = { x: 138, y: 34 }
       let dragA = false, dragB = false
-      const DR = 12
+      const DR = 14
+      const GRID = 48
 
       function dot(a, b) { return a.x * b.x + a.y * b.y }
       function mag(v) { return Math.hypot(v.x, v.y) }
       function norm(v) { const m = mag(v) || 1; return { x: v.x / m, y: v.y / m } }
 
-      function arrow(x1, y1, x2, y2, r, g, b, a = 220, sw = 2.5) {
+      function arrow(x1, y1, x2, y2, r, g, b, a = 220, sw = 3) {
         p.stroke(r, g, b, a); p.strokeWeight(sw)
         p.line(x1, y1, x2, y2)
-        const ang = Math.atan2(y2 - y1, x2 - x1), hs = 11
+        const ang = Math.atan2(y2 - y1, x2 - x1), hs = 13
         p.fill(r, g, b, a); p.noStroke()
         p.triangle(x2, y2,
           x2 - hs * Math.cos(ang - 0.42), y2 - hs * Math.sin(ang - 0.42),
           x2 - hs * Math.cos(ang + 0.42), y2 - hs * Math.sin(ang + 0.42))
       }
 
-      p.setup = () => { p.createCanvas(W, H); p.textFont('monospace'); if (cancelled) p.remove() }
+      p.setup = () => {
+        const cnv = p.createCanvas(W, H)
+        cnv.elt.style.width = '100%'
+        cnv.elt.style.height = 'auto'
+        cnv.elt.style.display = 'block'
+        // Backing buffer must have enough real pixels for the CSS-stretched
+        // display size (plus device pixel ratio) or the upscale looks blurry.
+        const rectW = cnv.elt.getBoundingClientRect().width || W
+        const density = Math.min(3, Math.max(1, rectW / W) * (window.devicePixelRatio || 1))
+        p.pixelDensity(density)
+        cnv.elt.style.width = '100%'
+        cnv.elt.style.height = 'auto'
+        cnv.elt.style.display = 'block'
+        p.textFont('monospace')
+        if (cancelled) p.remove()
+      }
 
       p.draw = () => {
         p.background(15, 20, 30)
 
         // Grid
         p.stroke(255, 255, 255, 11); p.strokeWeight(1)
-        for (let x = OX % 40; x < W; x += 40) p.line(x, 0, x, H)
-        for (let y = OY % 40; y < H; y += 40) p.line(0, y, W, y)
+        for (let x = OX % GRID; x < W; x += GRID) p.line(x, 0, x, H)
+        for (let y = OY % GRID; y < H; y += GRID) p.line(0, y, W, y)
 
         // Axes
         p.stroke(255, 255, 255, 32); p.strokeWeight(1)
@@ -661,42 +1099,42 @@ function Sim1D() {
           const projY = OY + bn.y * projLen
 
           // Dashed perpendicular from A tip to projection point
-          p.stroke(59, 130, 246, 100); p.strokeWeight(1.2)
+          p.stroke(59, 130, 246, 100); p.strokeWeight(1.4)
           p.drawingContext.setLineDash([4, 3])
           p.line(OX + vecA.x, OY + vecA.y, projX, projY)
           p.drawingContext.setLineDash([])
 
           // Projection segment on B axis
-          p.stroke(59, 130, 246, 180); p.strokeWeight(3.5)
+          p.stroke(59, 130, 246, 180); p.strokeWeight(4)
           p.line(OX, OY, projX, projY)
 
           // Projection endpoint marker
           p.fill(59, 130, 246, 200); p.noStroke()
-          p.circle(projX, projY, 7)
+          p.circle(projX, projY, 8)
         }
 
         // Resultant A+B (dashed, gray)
         const sx = OX + vecA.x + vecB.x, sy = OY + vecA.y + vecB.y
-        p.stroke(150, 150, 150, 55); p.strokeWeight(1.5)
+        p.stroke(150, 150, 150, 55); p.strokeWeight(1.8)
         p.drawingContext.setLineDash([5, 4])
         p.line(OX + vecA.x, OY + vecA.y, sx, sy)
         p.line(OX + vecB.x, OY + vecB.y, sx, sy)
         p.drawingContext.setLineDash([])
-        arrow(OX, OY, sx, sy, 150, 150, 150, 70, 1.5)
+        arrow(OX, OY, sx, sy, 150, 150, 150, 70, 1.8)
 
         // Vector B (amber — the "lead axis")
-        arrow(OX, OY, OX + vecB.x, OY + vecB.y, 245, 158, 11, 220, 2.5)
+        arrow(OX, OY, OX + vecB.x, OY + vecB.y, 245, 158, 11, 220, 3)
         const bAng = Math.atan2(vecB.y, vecB.x)
         p.fill(245, 158, 11, 190); p.noStroke()
-        p.textAlign(p.CENTER, p.CENTER); p.textSize(13)
-        p.text('B', OX + vecB.x + 15 * Math.cos(bAng + 0.5), OY + vecB.y + 15 * Math.sin(bAng + 0.5))
+        p.textAlign(p.CENTER, p.CENTER); p.textSize(14)
+        p.text('B', OX + vecB.x + 17 * Math.cos(bAng + 0.5), OY + vecB.y + 17 * Math.sin(bAng + 0.5))
 
         // Vector A (blue — the "cardiac vector")
-        arrow(OX, OY, OX + vecA.x, OY + vecA.y, 59, 130, 246, 220, 2.5)
+        arrow(OX, OY, OX + vecA.x, OY + vecA.y, 59, 130, 246, 220, 3)
         const aAng = Math.atan2(vecA.y, vecA.x)
         p.fill(59, 130, 246, 190); p.noStroke()
-        p.textAlign(p.CENTER, p.CENTER); p.textSize(13)
-        p.text('A', OX + vecA.x + 15 * Math.cos(aAng + 0.5), OY + vecA.y + 15 * Math.sin(aAng + 0.5))
+        p.textAlign(p.CENTER, p.CENTER); p.textSize(14)
+        p.text('A', OX + vecA.x + 17 * Math.cos(aAng + 0.5), OY + vecA.y + 17 * Math.sin(aAng + 0.5))
 
         // Drag handles
         p.fill(59, 130, 246); p.noStroke()
@@ -710,23 +1148,23 @@ function Sim1D() {
         const theta = Math.acos(Math.max(-1, Math.min(1, cosT))) * 180 / Math.PI
 
         p.fill(15, 20, 30, 215); p.noStroke()
-        p.rect(8, 8, 228, 80, 6)
-        p.textAlign(p.LEFT, p.TOP); p.textSize(11)
-        p.fill(255, 255, 255, 210); p.text(`A · B  = ${dotVal.toFixed(0)}`, 16, 16)
+        p.rect(9, 9, 246, 88, 7)
+        p.textAlign(p.LEFT, p.TOP); p.textSize(12)
+        p.fill(255, 255, 255, 210); p.text(`A · B  = ${dotVal.toFixed(0)}`, 18, 18)
         p.fill(200, 200, 200, 150)
-        p.text(`|A||B|cosθ = ${(am * bm * cosT).toFixed(0)}`, 16, 30)
+        p.text(`|A||B|cosθ = ${(am * bm * cosT).toFixed(0)}`, 18, 34)
         p.fill(180, 180, 180, 130)
-        p.text(`θ = ${theta.toFixed(1)}°    cosθ = ${cosT.toFixed(3)}`, 16, 44)
+        p.text(`θ = ${theta.toFixed(1)}°    cosθ = ${cosT.toFixed(3)}`, 18, 50)
         p.fill(120, 120, 120, 100)
-        p.text(`|A| = ${(am / 40).toFixed(2)}    |B| = ${(bm / 40).toFixed(2)}`, 16, 58)
+        p.text(`|A| = ${(am / GRID).toFixed(2)}    |B| = ${(bm / GRID).toFixed(2)}`, 18, 66)
 
         // Legend
-        p.fill(59, 130, 246, 150); p.textSize(9); p.textAlign(p.LEFT, p.TOP)
-        p.text('—— projection of A onto B', 16, 72)
+        p.fill(59, 130, 246, 150); p.textSize(10); p.textAlign(p.LEFT, p.TOP)
+        p.text('—— projection of A onto B', 18, 82)
 
         // Hint
-        p.fill(255, 255, 255, 60); p.textAlign(p.LEFT, p.BOTTOM); p.textSize(10)
-        p.text('Drag blue tip (A) or amber tip (B)', 8, H - 6)
+        p.fill(255, 255, 255, 60); p.textAlign(p.LEFT, p.BOTTOM); p.textSize(12)
+        p.text('Drag blue tip (A) or amber tip (B)', 9, H - 7)
       }
 
       p.mousePressed = () => {
@@ -810,33 +1248,11 @@ export default function PhysicsFoundations() {
           dipole model works.
         </Callout>
 
-        <ForwardLink>continues in 1C — voltage difference between two points</ForwardLink>
+        <ForwardLink>continues in 1C — the dot product projects the dipole onto a measurement axis</ForwardLink>
       </Section>
 
       {/* ── 1C ──────────────────────────────────────────────────────────────── */}
-      <Section label="1C" title="ECGs measure voltage difference, not absolute voltage">
-        <p className="text-sm text-gray-400 leading-relaxed mb-3">
-          Drag the two probes to different positions in the dipole field. The panel shows each
-          probe's voltage and the difference ΔV between them. Use the slider to change the charge
-          separation (the dipole moment) and watch ΔV scale. This is exactly what one ECG lead
-          measures: the potential difference between its two electrodes.
-        </p>
-
-        <Sim1C />
-
-        <Callout>
-          <strong className="text-white">Insight:</strong> The absolute voltage at any skin point
-          is large and arbitrary — what matters is the <em>difference</em> between two electrode
-          positions. This is why an electrode on your right foot still picks up cardiac signal. The
-          heart's dipole field extends throughout the body; each lead pair samples two points and
-          reports ΔV.
-        </Callout>
-
-        <ForwardLink>continues in 1D — the dot product projects the dipole onto a measurement axis</ForwardLink>
-      </Section>
-
-      {/* ── 1D ──────────────────────────────────────────────────────────────── */}
-      <Section label="1D" title="The dot product: what every lead does to the cardiac vector">
+      <Section label="1C" title="The dot product: what every lead does to the cardiac vector">
         <p className="text-sm text-gray-400 leading-relaxed mb-3">
           Vector <strong className="text-blue-400">A</strong> is the cardiac dipole at one instant.
           Vector <strong className="text-amber-400">B</strong> is the lead axis (the direction from −
@@ -871,6 +1287,36 @@ export default function PhysicsFoundations() {
           The waveform you see on screen is simply A&thinsp;·&thinsp;B plotted against time — the
           dot product of a rotating vector onto a stationary axis. Leads aligned with the mean
           cardiac axis see tall complexes; leads perpendicular to it see flat lines.
+        </Callout>
+
+        <ForwardLink>continues in 1D — how a depolarizing cell actually generates that dipole</ForwardLink>
+      </Section>
+
+      {/* ── 1D ──────────────────────────────────────────────────────────────── */}
+      <Section label="1D" title="Depolarization and repolarization of a cell generate a dipole">
+        <p className="text-sm text-gray-400 leading-relaxed mb-3">
+          Ten cells sit side by side, each polarized (+ outside) at rest. Press play: a wave of
+          depolarization sweeps left→right, flipping each cell's exterior charge negative in turn,
+          then each cell repolarizes back to positive in the same order. Watch the net dipole
+          vector above the row — it isn't just the boundary between two cells, it's the sum of
+          every cell's charge state at that instant. Drag the <span className="text-emerald-400">teal (A)</span> and{' '}
+          <span className="text-purple-400">purple (B)</span> probes to see the actual voltage the
+          cells' changing charges produce at any point, and watch ΔV = V(A) − V(B) in the panel below —
+          this is exactly how a real electrode pair would measure it. Toggle field lines,
+          equipotentials, or current lines to see the field itself.
+        </p>
+
+        <Sim1DCells />
+
+        <Callout>
+          <strong className="text-white">Insight:</strong> The strip-chart traces p(t) = Σ sᵢ(t)·(xᵢ−cx) —
+          it rises, peaks, and falls as the wave crosses the row, the same shape as a real QRS
+          complex. Notice the vector <em>reverses direction</em> during repolarization: the same
+          left→right activation order now sweeps recovery instead of depolarization, so the
+          negative and positive centroids swap sides. This is exactly the dipole from 1A/1B — here
+          you're watching it being generated cell by cell instead of assuming it, and the two
+          probes show that it's also directly measurable as a plain voltage difference, just like
+          1E's electrodes.
         </Callout>
 
         <ForwardLink>continues in 1E — place real electrodes on a body and see the projection live</ForwardLink>

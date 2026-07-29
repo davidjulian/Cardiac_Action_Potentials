@@ -229,668 +229,6 @@ const STRUCT_NOTE = {
   repolRV: 'RV repolarization contributes to early T wave. Smaller contribution than LV.',
 }
 
-// ── 2C Depolarization sequence — heart geometry + stage data ──────────────
-// Scale + offset mapping HeartAnimation SVG viewBox (0 0 200 260) → canvas px
-const _HS = 1.35, _HOX = 20, _HOY = 10
-const _hx = x => _HOX + x * _HS
-const _hy = y => _HOY + y * _HS
-
-// Exterior anterior-oblique view of the heart (matches Boron & Boulpaep reference image)
-function _pOutline(ctx) {
-  ctx.beginPath()
-  ctx.moveTo(_hx(65), _hy(38))
-  ctx.bezierCurveTo(_hx(68),_hy(18), _hx(88),_hy(8),  _hx(108),_hy(8))
-  ctx.bezierCurveTo(_hx(132),_hy(8), _hx(155),_hy(24), _hx(165),_hy(46))
-  ctx.bezierCurveTo(_hx(172),_hy(62), _hx(170),_hy(84), _hx(160),_hy(100))
-  ctx.bezierCurveTo(_hx(162),_hy(118), _hx(162),_hy(150), _hx(156),_hy(178))
-  ctx.bezierCurveTo(_hx(148),_hy(210), _hx(128),_hy(234), _hx(106),_hy(248))
-  ctx.bezierCurveTo(_hx(96),_hy(254), _hx(80),_hy(254), _hx(70),_hy(248))
-  ctx.bezierCurveTo(_hx(50),_hy(238), _hx(32),_hy(214), _hx(22),_hy(184))
-  ctx.bezierCurveTo(_hx(14),_hy(157), _hx(18),_hy(124), _hx(28),_hy(100))
-  ctx.bezierCurveTo(_hx(36),_hy(78),  _hx(48),_hy(58),  _hx(58),_hy(44))
-  ctx.bezierCurveTo(_hx(60),_hy(38),  _hx(62),_hy(36),  _hx(65),_hy(38))
-  ctx.closePath()
-}
-function _pAtriaRegion(ctx) {
-  ctx.beginPath()
-  ctx.moveTo(_hx(28), _hy(100))
-  ctx.bezierCurveTo(_hx(36),_hy(78),  _hx(48),_hy(58),  _hx(58),_hy(44))
-  ctx.bezierCurveTo(_hx(62),_hy(38),  _hx(66),_hy(30),  _hx(68),_hy(20))
-  ctx.bezierCurveTo(_hx(80),_hy(6),   _hx(96),_hy(8),   _hx(108),_hy(8))
-  ctx.bezierCurveTo(_hx(132),_hy(8),  _hx(155),_hy(24), _hx(165),_hy(46))
-  ctx.bezierCurveTo(_hx(172),_hy(62), _hx(170),_hy(84), _hx(160),_hy(100))
-  ctx.lineTo(_hx(28), _hy(100))
-  ctx.closePath()
-}
-function _pVentricleMass(ctx) {
-  ctx.beginPath()
-  ctx.moveTo(_hx(28), _hy(100))
-  ctx.lineTo(_hx(160), _hy(100))
-  ctx.bezierCurveTo(_hx(162),_hy(118), _hx(162),_hy(150), _hx(156),_hy(178))
-  ctx.bezierCurveTo(_hx(148),_hy(210), _hx(128),_hy(234), _hx(106),_hy(248))
-  ctx.bezierCurveTo(_hx(96),_hy(254),  _hx(80),_hy(254),  _hx(70),_hy(248))
-  ctx.bezierCurveTo(_hx(50),_hy(238),  _hx(32),_hy(214),  _hx(22),_hy(184))
-  ctx.bezierCurveTo(_hx(14),_hy(157),  _hx(18),_hy(124),  _hx(28),_hy(100))
-  ctx.closePath()
-}
-const _RPATHS = { atria: _pAtriaRegion, ventr: _pVentricleMass }
-// Ventricular fill geometry constants
-const _VCX  = _hx(92)              // center x of ventricular mass (septum)
-const _VTY  = _hy(100)             // top of ventricle (AV groove level)
-const _VBY  = _hy(254)             // bottom (apex)
-const _VH   = _VBY - _VTY
-const _VSEP = _hx(108) - _hx(92)  // septum half-width in px (~21.6px)
-const _VMAX = _hx(162) - _hx(92)  // max right half-width in px (~94.5px)
-const _ACLIP = { x:_hx(28), y:_hy(8), w:_hx(165)-_hx(28), fullH:_hy(100)-_hy(8) }
-
-const DEPOLSEQ_STAGES = [
-  { id:1, stageNum:'1 of 6', ecgPart:'P',  color:[59,130,246],  start:0,   end:80,
-    label:'Depolarize atria',
-    note:"SA node fires → both atria depolarize simultaneously via Bachmann's bundle. AV annulus is electrically insulated — impulse funnels exclusively into AV node." },
-  { id:2, stageNum:'2 of 6', ecgPart:'Q',  color:[139,92,246],  start:180, end:200,
-    label:'Depolarize septum — left to right',
-    note:'Left bundle branch activates the LV endocardial face of the septum first. Initial vector points toward RV (rightward) → produces the narrow Q wave in lateral leads (I, V5–V6).' },
-  { id:3, stageNum:'3 of 6', ecgPart:'R↑', color:[139,92,246],  start:200, end:220,
-    label:'Anteroseptal region toward the apex',
-    note:'Purkinje system delivers depolarization apically at 2–4 m/s. Nearly simultaneous endocardial activation from apex upward. Main QRS deflection begins.' },
-  { id:4, stageNum:'4 of 6', ecgPart:'R',  color:[139,92,246],  start:220, end:240,
-    label:'Bulk ventricular myocardium (endo → epi)',
-    note:'Dominant LV mass activates endocardium → epicardium at 0.3–0.5 m/s. Net vector points LEFT and INFERIOR — R wave in leads I, II, V4–V6. Normal QRS axis ≈ +60°.' },
-  { id:5, stageNum:'5 of 6', ecgPart:'S',  color:[139,92,246],  start:240, end:260,
-    label:'Posterior base of left ventricle',
-    note:'Last myocardium to depolarize: posterior-basal LV (circumflex territory from Module 2A). Late vector points SUPERIOR/POSTERIOR → S wave in lateral leads.' },
-  { id:6, stageNum:'6 of 6', ecgPart:'ST', color:[52,211,153],  start:260, end:380,
-    label:'Ventricles fully depolarized (ST segment)',
-    note:'All myocardium in plateau phase — no net dipole, isoelectric baseline. Ischemic injury current (STEMI/NSTEMI) disrupts this equilibrium, shifting the ST segment.' },
-  { id:7, stageNum:'Repol',  ecgPart:'T',  color:[245,158,11],  start:380, end:540,
-    label:'Repolarization — base to apex (T wave)',
-    note:'Epicardial cells (prominent Ito) have shorter action potentials → repolarize before endocardial cells. Repolarization direction = same as QRS net vector → T wave is UPRIGHT in leads with tall R.' },
-]
-
-function _getDepolStage(tMs) {
-  if (tMs >= 80 && tMs < 180) return { id:'av', stageNum:'AV delay', ecgPart:'PR', color:[100,120,140], start:80, end:180,
-    label:'AV nodal delay — PR segment',
-    note:'Conduction slows to 0.05 m/s in the AV node — the slowest in the heart. This 100 ms pause allows ventricular filling before systole. PR segment is isoelectric.',
-    progress:(tMs-80)/100 }
-  if (tMs >= 540) return { id:'diastole', stageNum:'Diastole', ecgPart:'—', color:[55,65,80], start:540, end:800,
-    label:'Electrical diastole',
-    note:'Myocardium at −90 mV (IK1). SA node pacemaker potential building via If (HCN channels) toward next threshold.',
-    progress:(tMs-540)/260 }
-  for (const s of DEPOLSEQ_STAGES)
-    if (tMs >= s.start && tMs < s.end) return { ...s, progress:(tMs-s.start)/(s.end-s.start) }
-  return null
-}
-
-function _getDepolFills(tMs) {
-  const cl = v => Math.max(0, Math.min(1, v))
-  return {
-    atria:   cl(tMs/80),                           // stage 1: both atria
-    septum:  tMs<180 ? 0 : cl((tMs-180)/20),       // stage 2: septal band appears top-down
-    apex:    tMs<200 ? 0 : cl((tMs-200)/20),       // stage 3: apex extension bottom-up
-    lateral: tMs<220 ? 0 : cl((tMs-220)/40),       // stage 4: lateral walls expand outward
-    repolA:  tMs<540 ? 0 : cl((tMs-540)/100),
-    repolV:  tMs<380 ? 0 : cl((tMs-380)/160),
-  }
-}
-
-const _DEPOLHOVER = {
-  atria: { name:'Atria (RA + LA)', cv:'1.0 m/s',     note:'SA node fires → bilateral atrial depolarization via Bachmann\'s bundle' },
-  ventr: { name:'Ventricles (LV + RV)', cv:'0.3–0.5 m/s', note:'Purkinje network → endocardium-to-epicardium spread. LV mass dominates QRS.' },
-}
-const _ECG_REGIONS = [
-  { label:'P',   from:0.030, to:0.100, stages:[1],         color:[59,130,246]  },
-  { label:'PR',  from:0.100, to:0.225, stages:['av'],       color:[100,120,140] },
-  { label:'QRS', from:0.225, to:0.300, stages:[2,3,4,5],   color:[139,92,246]  },
-  { label:'ST',  from:0.300, to:0.475, stages:[6],          color:[52,211,153]  },
-  { label:'T',   from:0.475, to:0.670, stages:[7],          color:[245,158,11]  },
-]
-
-// ── DepolarizationSequence canvas component ────────────────────────────────
-function DepolarizationSequence({ masterTimeMs, cycleMs, waves, onScrub, isPlaying, onToggle, speedMult, onSpeedChange }) {
-  const containerRef = useRef()
-  const p5Ref        = useRef(null)
-  const dataRef      = useRef({ masterTimeMs, cycleMs, waves })
-  const [tooltip, setTooltip]     = useState(null)
-  const [tipPos,  setTipPos]      = useState({ x:0, y:0 })
-
-  useEffect(() => { dataRef.current = { masterTimeMs, cycleMs, waves }; p5Ref.current?.redraw() }, [masterTimeMs, cycleMs, waves])
-
-  const handleMouseMove = useCallback((e) => {
-    const canvas = containerRef.current?.querySelector('canvas')
-    if (!canvas) return
-    const rect = canvas.getBoundingClientRect()
-    const mx = (e.clientX - rect.left) * (canvas.width / rect.width)
-    const my = (e.clientY - rect.top)  * (canvas.height / rect.height)
-    const ctx = canvas.getContext('2d')
-    for (const [id, fn] of Object.entries(_RPATHS)) {
-      fn(ctx)
-      if (ctx.isPointInPath(mx, my)) {
-        setTooltip(_DEPOLHOVER[id])
-        setTipPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
-        return
-      }
-    }
-    setTooltip(null)
-  }, [])
-  const handleMouseLeave = useCallback(() => setTooltip(null), [])
-
-  useEffect(() => {
-    const W = 640, H = 415
-    const PNL_X = 336   // right info-panel start
-    const ECG_Y = 350, ECG_H = 56
-    const DV_CX = PNL_X + (W - PNL_X) / 2, DV_CY = ECG_Y - 85, DV_R = 56
-
-    function arrow(ctx, x1, y1, x2, y2, col = '#8B0000', lw = 2.5) {
-      const a = Math.atan2(y2-y1, x2-x1), hl = 9
-      ctx.save(); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round'
-      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke()
-      ctx.beginPath(); ctx.moveTo(x2,y2)
-      ctx.lineTo(x2-hl*Math.cos(a-0.4), y2-hl*Math.sin(a-0.4))
-      ctx.lineTo(x2-hl*Math.cos(a+0.4), y2-hl*Math.sin(a+0.4))
-      ctx.closePath(); ctx.fill(); ctx.restore()
-    }
-    function curvedArrow(ctx, x1, y1, cpx, cpy, x2, y2, col = '#8B0000') {
-      const a = Math.atan2(y2-cpy, x2-cpx), hl = 9
-      ctx.save(); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.5; ctx.lineCap = 'round'
-      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.quadraticCurveTo(cpx,cpy,x2,y2); ctx.stroke()
-      ctx.beginPath(); ctx.moveTo(x2,y2)
-      ctx.lineTo(x2-hl*Math.cos(a-0.4), y2-hl*Math.sin(a-0.4))
-      ctx.lineTo(x2-hl*Math.cos(a+0.4), y2-hl*Math.sin(a+0.4))
-      ctx.closePath(); ctx.fill(); ctx.restore()
-    }
-    function rrect(ctx, x, y, w, h, r, fill, stroke) {
-      ctx.beginPath()
-      ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r)
-      ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r)
-      ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r)
-      ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r); ctx.closePath()
-      if (fill)  { ctx.fillStyle   = fill;   ctx.fill()   }
-      if (stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke() }
-    }
-    function fillRegion(ctx, pathFn, cr, dp, rp) {
-      ctx.save(); pathFn(ctx); ctx.fillStyle='#252e42'; ctx.fill()
-      ctx.strokeStyle='#36455a'; ctx.lineWidth=1.2; ctx.stroke(); ctx.restore()
-      if (dp > 0.005) {
-        const h = cr.fullH * Math.min(1, dp)
-        ctx.save(); pathFn(ctx); ctx.clip()
-        ctx.fillStyle='#F5C518'; ctx.globalAlpha=Math.min(1, 0.5+dp*0.5)
-        ctx.fillRect(cr.x, cr.y, cr.w, h); ctx.globalAlpha=1; ctx.restore()
-      }
-      if (rp > 0.005) {
-        const h = cr.fullH * Math.min(1, rp)
-        ctx.save(); pathFn(ctx); ctx.clip()
-        ctx.fillStyle='#87CEEB'; ctx.globalAlpha=Math.min(1, 0.4+rp*0.6)
-        ctx.fillRect(cr.x, cr.y+cr.fullH-h, cr.w, h); ctx.globalAlpha=1; ctx.restore()
-      }
-    }
-    function wrapText(ctx, text, x, y, maxW, lineH) {
-      const words = text.split(' '); let line = ''
-      for (const word of words) {
-        const test = line + (line?' ':'') + word
-        if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line,x,y); y+=lineH; line=word }
-        else line=test
-      }
-      if (line) ctx.fillText(line,x,y)
-    }
-
-    const sketch = (p) => {
-      let ecgCache = null
-      function buildCache(w, cm) {
-        if (!w||!cm) return []
-        return Array.from({length:500},(_,i) => ECGVoltage((i/500)*cm, cm, w, 60))
-      }
-
-      p.setup = () => { p.createCanvas(W, H); p.noLoop() }
-
-      p.draw = () => {
-        const { masterTimeMs:tMs, cycleMs:cm, waves:w } = dataRef.current
-        const ctx = p.drawingContext
-        const stage  = _getDepolStage(tMs)
-        const fills  = _getDepolFills(tMs)
-        const DARK   = '#8B0000', BLUE = '#87CEEB'
-
-        p.background(13, 17, 30)
-
-        // Right panel background
-        rrect(ctx, PNL_X-2, 4, W-PNL_X-2, H-8, 8, '#0f1726', '#1b2d42')
-
-        // ── Exterior-view heart (Boron & Boulpaep reference style) ──
-        const GRAY='#888888', YEL='#F5C518', BLEU='#87CEEB'
-        const vColor = fills.repolV > 0.01 ? BLEU : YEL
-        const aColor = fills.repolA > 0.01 ? BLEU : YEL
-
-        // 1. Black silhouette — creates thick epicardial border effect
-        ctx.save(); _pOutline(ctx); ctx.fillStyle='#000'; ctx.fill(); ctx.restore()
-
-        // 2. Gray base fills (resting myocardium)
-        ctx.save(); _pAtriaRegion(ctx);   ctx.fillStyle=GRAY; ctx.fill(); ctx.restore()
-        ctx.save(); _pVentricleMass(ctx); ctx.fillStyle=GRAY; ctx.fill(); ctx.restore()
-
-        // 3. Great vessel stubs (pulmonary trunk + aorta) — gray with thick black border
-        ctx.save()
-        ctx.fillStyle=GRAY; ctx.strokeStyle='#000'; ctx.lineWidth=4; ctx.lineJoin='round'
-        // Pulmonary trunk (upper-left of base)
-        ctx.beginPath()
-        ctx.moveTo(_hx(55),_hy(38)); ctx.lineTo(_hx(55),_hy(2))
-        ctx.lineTo(_hx(78),_hy(2)); ctx.lineTo(_hx(78),_hy(28))
-        ctx.fill(); ctx.stroke()
-        // Aorta (upper-right of base, slightly taller)
-        ctx.beginPath()
-        ctx.moveTo(_hx(108),_hy(18)); ctx.lineTo(_hx(108),_hy(0))
-        ctx.lineTo(_hx(130),_hy(0)); ctx.lineTo(_hx(130),_hy(12))
-        ctx.fill(); ctx.stroke()
-        // Labels
-        ctx.fillStyle='#9ca3af'; ctx.font='7px sans-serif'; ctx.textAlign='center'
-        ctx.fillText('PA',  _hx(66.5),_hy(-4))
-        ctx.fillText('Ao',  _hx(119),  _hy(-4))
-        ctx.restore()
-
-        // 4. Atrial fill: top-down sweep (stage 1)
-        if (fills.atria > 0.004) {
-          const ah = _ACLIP.fullH * Math.min(1, fills.atria)
-          ctx.save(); _pAtriaRegion(ctx); ctx.clip()
-          ctx.fillStyle=aColor; ctx.fillRect(_ACLIP.x, _ACLIP.y, _ACLIP.w, ah)
-          ctx.restore()
-        }
-
-        // 5. Ventricular fills — septal band → apex extension → lateral spread
-        // Stage 2: narrow septal band, top-down
-        if (fills.septum > 0.004) {
-          const sh = _VH * Math.min(1, fills.septum)
-          ctx.save(); _pVentricleMass(ctx); ctx.clip()
-          ctx.fillStyle=vColor; ctx.fillRect(_VCX-_VSEP, _VTY, _VSEP*2, sh)
-          ctx.restore()
-        }
-        // Stage 3: apex fill, bottom-up from apex, slightly wider than septum
-        if (fills.apex > 0.004) {
-          const ah = _VH * Math.min(1, fills.apex * 1.5)
-          const hw = _VSEP + (_VMAX*0.35) * Math.min(1, fills.apex)
-          ctx.save(); _pVentricleMass(ctx); ctx.clip()
-          ctx.fillStyle=vColor; ctx.fillRect(_VCX-hw, _VBY-ah, hw*2, ah)
-          ctx.restore()
-        }
-        // Stage 4: lateral expansion — grows outward from septum at full height
-        if (fills.lateral > 0.004) {
-          const hw = _VSEP + (_VMAX-_VSEP) * Math.min(1, fills.lateral * 1.2)
-          ctx.save(); _pVentricleMass(ctx); ctx.clip()
-          ctx.fillStyle=vColor; ctx.fillRect(_VCX-hw, _VTY, hw*2, _VH)
-          ctx.restore()
-        }
-
-        // 6. Repolarization: blue sweep (base to apex = top-down) over ventricles and atria
-        if (fills.repolV > 0.004) {
-          const rh = _VH * Math.min(1, fills.repolV)
-          ctx.save(); _pVentricleMass(ctx); ctx.clip()
-          ctx.fillStyle=BLEU; ctx.fillRect(_VCX-_VMAX-4, _VTY, (_VMAX+4)*2, rh)
-          ctx.restore()
-        }
-        if (fills.repolA > 0.004) {
-          const rh = _ACLIP.fullH * Math.min(1, fills.repolA)
-          ctx.save(); _pAtriaRegion(ctx); ctx.clip()
-          ctx.fillStyle=BLEU; ctx.fillRect(_ACLIP.x, _ACLIP.y, _ACLIP.w, rh)
-          ctx.restore()
-        }
-
-        // 7. AV groove line
-        ctx.save(); ctx.strokeStyle='#000'; ctx.lineWidth=3; ctx.lineCap='butt'
-        ctx.beginPath(); ctx.moveTo(_hx(28),_hy(100)); ctx.lineTo(_hx(160),_hy(100)); ctx.stroke()
-        ctx.restore()
-
-        // 8. Thick black epicardial border (re-stroke on top)
-        ctx.save(); _pOutline(ctx)
-        ctx.strokeStyle='#000'; ctx.lineWidth=10; ctx.lineJoin='round'; ctx.stroke()
-        ctx.restore()
-
-        // 9. SA node — starburst shape at RA appendage peak
-        const saOn = tMs >= 0 && tMs < 85
-        const saFlash = saOn ? Math.sin((tMs/80)*Math.PI) : 0
-        const sax = _hx(152), say = _hy(42)
-        ctx.save()
-        // Draw starburst polygon
-        ctx.beginPath()
-        for (let i=0;i<10;i++) {
-          const ang = (i/10)*Math.PI*2 - Math.PI/2
-          const r = i%2===0 ? (saOn?8+4*saFlash:7) : (saOn?3+saFlash:3)
-          const px = sax+r*Math.cos(ang), py = say+r*Math.sin(ang)
-          if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py)
-        }
-        ctx.closePath()
-        ctx.fillStyle = saOn ? `rgba(255,235,80,${0.8+0.2*saFlash})` : '#707060'
-        ctx.strokeStyle = saOn ? '#FFFF66' : '#555'
-        ctx.lineWidth=1; ctx.fill(); ctx.stroke()
-        if (saOn && saFlash > 0.3) {
-          ctx.globalAlpha=0.5*saFlash
-          for (let i=0;i<6;i++) {
-            const ang=(i/6)*Math.PI*2, rl=11+7*saFlash
-            ctx.strokeStyle='#FFE040'; ctx.lineWidth=1.2
-            ctx.beginPath(); ctx.moveTo(sax+7*Math.cos(ang),say+7*Math.sin(ang))
-            ctx.lineTo(sax+rl*Math.cos(ang),say+rl*Math.sin(ang)); ctx.stroke()
-          }
-          ctx.globalAlpha=1
-        }
-        ctx.fillStyle='#93c5fd'; ctx.font='bold 7px sans-serif'; ctx.textAlign='left'
-        ctx.fillText('SA node',_hx(158),_hy(38)); ctx.restore()
-
-        // 10. Bachmann's bundle (dashed across top of atria)
-        const bachOn = tMs>=0&&tMs<80
-        ctx.save(); ctx.beginPath()
-        ctx.moveTo(_hx(148),_hy(36)); ctx.quadraticCurveTo(_hx(100),_hy(16),_hx(68),_hy(32))
-        ctx.strokeStyle=bachOn?'#93c5fd':'#2a3a50'
-        ctx.lineWidth=bachOn?2.2:1.5; ctx.setLineDash([3,2]); ctx.stroke()
-        ctx.setLineDash([]); ctx.restore()
-
-        // 11. AV node (at AV groove, medial side)
-        const avOn = tMs>=80&&tMs<180
-        const avPulse = avOn ? 0.7+0.3*Math.sin(((tMs-80)/100)*Math.PI) : 0.8
-        ctx.save(); ctx.beginPath(); ctx.arc(_hx(118),_hy(100),6,0,Math.PI*2)
-        ctx.fillStyle=avOn?`rgba(124,58,237,${avPulse})`:'#444'
-        ctx.fill(); ctx.strokeStyle=avOn?'#a78bfa':'#333'; ctx.lineWidth=1.2; ctx.stroke()
-        ctx.fillStyle='#ede9fe'; ctx.font='bold 7px sans-serif'; ctx.textAlign='left'
-        ctx.fillText('AV node',_hx(126),_hy(103)); ctx.restore()
-
-        // 12. Bundle of His + branches
-        const hisOn = tMs>=180&&tMs<205
-        const bbOn  = tMs>=185&&tMs<225
-        ctx.save(); ctx.lineCap='round'
-        ctx.strokeStyle=hisOn?'#c084fc':'#252535'; ctx.lineWidth=hisOn?3:1.5
-        ctx.beginPath(); ctx.moveTo(_hx(116),_hy(104)); ctx.lineTo(_hx(100),_hy(130)); ctx.stroke()
-        ctx.strokeStyle=bbOn?'#db2777':'#252535'; ctx.lineWidth=bbOn?2.5:1.5
-        // Left bundle (to LV — right side in canvas for this anterior-oblique view)
-        ctx.beginPath(); ctx.moveTo(_hx(100),_hy(130))
-        ctx.quadraticCurveTo(_hx(118),_hy(152),_hx(130),_hy(182)); ctx.stroke()
-        // Right bundle (to RV — left side)
-        ctx.beginPath(); ctx.moveTo(_hx(100),_hy(130))
-        ctx.quadraticCurveTo(_hx(78),_hy(152),_hx(60),_hy(182)); ctx.stroke()
-        ctx.restore()
-
-        // 13. Chamber labels
-        ctx.save(); ctx.textAlign='center'; ctx.font='bold 9px sans-serif'
-        const darkOnYel = '#1a1000', lightOnGray = '#6a7a8a'
-        ctx.fillStyle=fills.atria>0.4?darkOnYel:lightOnGray
-        ctx.fillText('RA',_hx(148),_hy(60))
-        ctx.fillText('LA',_hx(72),_hy(52))
-        const ventrFilled = fills.lateral>0.4||(fills.apex>0.6&&fills.lateral>0)
-        ctx.fillStyle=ventrFilled?darkOnYel:lightOnGray
-        ctx.fillText('RV',_hx(45),_hy(168))
-        ctx.fillText('LV',_hx(140),_hy(178))
-        ctx.restore()
-
-        // 14. Stage-specific directional arrows
-        if (stage) {
-          switch(stage.id) {
-            case 1:
-              curvedArrow(ctx,_hx(148),_hy(38),_hx(100),_hy(20),_hx(68),_hy(34),DARK)
-              arrow(ctx,_hx(100),_hy(72),_hx(100),_hy(98),DARK)
-              break
-            case 2:
-              arrow(ctx,_hx(112),_hy(168),_hx(78),_hy(168),DARK)
-              ctx.save(); ctx.fillStyle='#ef4444'; ctx.font='8px sans-serif'; ctx.textAlign='center'
-              ctx.fillText('L→R',_hx(95),_hy(157)); ctx.restore()
-              break
-            case 3:
-              arrow(ctx,_hx(93),_hy(148),_hx(84),_hy(228),DARK)
-              break
-            case 4:
-              arrow(ctx,_hx(108),_hy(172),_hx(148),_hy(162),DARK)
-              arrow(ctx,_hx(80),_hy(172),_hx(42),_hy(162),DARK)
-              break
-            case 5:
-              arrow(ctx,_hx(138),_hy(208),_hx(148),_hy(118),DARK)
-              break
-            case 7:
-              arrow(ctx,_hx(142),_hy(115),_hx(122),_hy(215),BLEU)
-              arrow(ctx,_hx(52),_hy(115),_hx(62),_hy(215),BLEU)
-              break
-            default: break
-          }
-        }
-
-        // Stage annotation label box (bottom-left of heart area)
-        if (stage && stage.id !== 'diastole') {
-          const bx=2, by=ECG_Y-76, bw=PNL_X-8, bh=68
-          rrect(ctx,bx,by,bw,bh,6,'rgba(8,12,25,0.92)','#25405a')
-          const [cr,cg,cb]=stage.color||[180,180,180]
-          ctx.save()
-          ctx.fillStyle=`rgb(${cr},${cg},${cb})`; ctx.font='bold 8.5px monospace'; ctx.textAlign='left'
-          ctx.fillText(`Stage ${stage.stageNum}`,bx+8,by+14)
-          ctx.fillStyle='#cbd5e1'; ctx.font='9px monospace'
-          wrapText(ctx,stage.label,bx+8,by+28,bw-16,13)
-          ctx.restore()
-        }
-
-        // ── Right panel: stage info ──
-        if (stage) {
-          const [cr,cg,cb]=stage.color||[180,180,180]
-          const pW = W - PNL_X - 10
-          ctx.save()
-          ctx.fillStyle='#6b7280'; ctx.font='7.5px monospace'; ctx.textAlign='left'
-          ctx.fillText('CURRENT STAGE', PNL_X+8, 20)
-          ctx.fillStyle=`rgb(${cr},${cg},${cb})`; ctx.font='bold 10px monospace'
-          ctx.fillText(stage.stageNum, PNL_X+8, 35)
-          ctx.fillStyle='#e2e8f0'; ctx.font='9.5px sans-serif'
-          wrapText(ctx,stage.label, PNL_X+8, 50, pW, 13)
-          ctx.fillStyle='#4b5563'; ctx.font='7.5px monospace'
-          ctx.fillText('ECG CORRELATION', PNL_X+8, 82)
-          ctx.fillStyle=`rgb(${cr},${cg},${cb})`; ctx.font='bold 13px monospace'
-          ctx.fillText(stage.ecgPart, PNL_X+8, 98)
-          if (stage.note) {
-            ctx.fillStyle='#718496'; ctx.font='8px sans-serif'
-            wrapText(ctx,stage.note, PNL_X+8, 116, pW, 11)
-          }
-          ctx.restore()
-        }
-
-        // ── Cardiac dipole mini-vector ──
-        ctx.save()
-        ctx.fillStyle='#374151'; ctx.font='7px monospace'; ctx.textAlign='center'
-        ctx.fillText('Cardiac dipole vector', DV_CX, DV_CY-DV_R-5)
-        ctx.strokeStyle='#1c2e42'; ctx.lineWidth=0.8
-        ctx.beginPath(); ctx.moveTo(DV_CX-DV_R,DV_CY); ctx.lineTo(DV_CX+DV_R,DV_CY); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(DV_CX,DV_CY-DV_R); ctx.lineTo(DV_CX,DV_CY+DV_R); ctx.stroke()
-        ctx.beginPath(); ctx.arc(DV_CX,DV_CY,DV_R,0,Math.PI*2); ctx.stroke()
-        ctx.fillStyle='#2d3f52'; ctx.font='7px monospace'
-        ctx.fillText('I →', DV_CX+DV_R+10, DV_CY+3)
-        ctx.fillText('aVF ↓', DV_CX, DV_CY+DV_R+10)
-        const tMs2 = dataRef.current.masterTimeMs
-        const cm2  = dataRef.current.cycleMs
-        const w2   = dataRef.current.waves
-        const Vx = (w2&&cm2)?ECGVoltage(tMs2,cm2,w2,0):0
-        const Vy = (w2&&cm2)?ECGVoltage(tMs2,cm2,w2,90):0
-        const mag = Math.sqrt(Vx*Vx+Vy*Vy)
-        if (mag>0.005) arrow(ctx,DV_CX,DV_CY,DV_CX+Vx*DV_R*1.1,DV_CY+Vy*DV_R*1.1,'#34d399',2)
-        ctx.beginPath(); ctx.arc(DV_CX,DV_CY,3,0,Math.PI*2)
-        ctx.fillStyle='#9ca3af'; ctx.fill(); ctx.restore()
-
-        // ── ECG mini-strip ──
-        const sx=4, sw=632, sbl=ECG_Y+ECG_H/2
-        rrect(ctx,sx,ECG_Y,sw,ECG_H,4,'#0b1120','#1a2c3e')
-        ctx.save(); ctx.strokeStyle='#182030'; ctx.lineWidth=0.5
-        ctx.beginPath(); ctx.moveTo(sx,sbl); ctx.lineTo(sx+sw,sbl); ctx.stroke()
-        for (let xi=0;xi<=8;xi++) {
-          const lx=sx+xi*sw/8
-          ctx.beginPath(); ctx.moveTo(lx,ECG_Y+2); ctx.lineTo(lx,ECG_Y+ECG_H-2); ctx.stroke()
-        }
-        ctx.restore()
-        // Region highlight
-        if (stage) {
-          const reg=_ECG_REGIONS.find(r=>r.stages.includes(stage.id))
-          if (reg) {
-            const [cr,cg,cb]=reg.color
-            ctx.save()
-            ctx.fillStyle=`rgba(${cr},${cg},${cb},0.18)`
-            ctx.fillRect(sx+reg.from*sw, ECG_Y+2, (reg.to-reg.from)*sw, ECG_H-4)
-            ctx.fillStyle=`rgb(${cr},${cg},${cb})`; ctx.font='8px monospace'; ctx.textAlign='center'
-            ctx.fillText(reg.label, sx+(reg.from+reg.to)*sw/2, ECG_Y+11)
-            ctx.restore()
-          }
-        }
-        // ECG curve
-        if (!ecgCache||ecgCache.length<2) ecgCache=buildCache(w,cm)
-        if (ecgCache&&ecgCache.length>2) {
-          const maxV=Math.max(...ecgCache.map(Math.abs),0.01)
-          const amp=(ECG_H*0.38)/maxV
-          ctx.save(); ctx.strokeStyle='#34d399'; ctx.lineWidth=1.6; ctx.lineJoin='round'; ctx.beginPath()
-          ecgCache.forEach((v,i) => {
-            const px=sx+(i/ecgCache.length)*sw, py=sbl-v*amp
-            if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py)
-          })
-          ctx.stroke(); ctx.restore()
-        }
-        // Dim region labels for inactive regions
-        ctx.save(); ctx.font='7px monospace'; ctx.textAlign='center'; ctx.fillStyle='#253445'
-        for (const r of _ECG_REGIONS) {
-          if (stage && _ECG_REGIONS.find(er=>er.stages.includes(stage.id))?.label===r.label) continue
-          ctx.fillText(r.label, sx+(r.from+r.to)*sw/2, ECG_Y+11)
-        }
-        ctx.restore()
-        // Time cursor
-        const normT=((tMs%(cm||CYCLE_MS))/(cm||CYCLE_MS))
-        const tcx=sx+normT*sw
-        ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.45)'; ctx.lineWidth=1.2; ctx.setLineDash([3,3])
-        ctx.beginPath(); ctx.moveTo(tcx,ECG_Y+2); ctx.lineTo(tcx,ECG_Y+ECG_H-2); ctx.stroke()
-        ctx.setLineDash([]); ctx.restore()
-        // Timestamp
-        ctx.save(); ctx.fillStyle='#2d3d50'; ctx.font='7px monospace'; ctx.textAlign='right'
-        ctx.fillText(`${Math.round(tMs)} ms / ${cm||CYCLE_MS} ms`, W-6, H-4); ctx.restore()
-      }
-    }
-
-    const container = containerRef.current
-    if (!container) return
-    let inst
-    const rafId = requestAnimationFrame(() => {
-      if (!container.isConnected) return
-      while (container.firstChild) container.removeChild(container.firstChild)
-      inst = new p5(sketch, container)
-      p5Ref.current = inst
-    })
-    return () => {
-      cancelAnimationFrame(rafId); p5Ref.current = null
-      if (inst) { try { inst.remove() } catch(_) {} }
-      while (container.firstChild) container.removeChild(container.firstChild)
-    }
-  }, [])
-
-  const stepToStage = useCallback((dir) => {
-    const tMs = dataRef.current.masterTimeMs
-    const bounds = [0, 80, 180, 200, 220, 240, 260, 380, 540, 800]
-    if (dir > 0) {
-      const next = bounds.find(b => b > tMs + 2)
-      if (next != null) onScrub(next)
-    } else {
-      const prev = [...bounds].reverse().find(b => b < tMs - 2)
-      if (prev != null) onScrub(prev)
-    }
-  }, [onScrub])
-
-  const stage = _getDepolStage(masterTimeMs)
-
-  return (
-    <div className="mt-5">
-      <div className="text-xs font-mono text-cyan-500 uppercase tracking-widest mb-2">
-        Anatomical Depolarization Sequence — Boron &amp; Boulpaep 6-Stage Model
-      </div>
-
-      <div
-        className="relative rounded-xl border border-gray-800 overflow-hidden"
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-      >
-        <div ref={containerRef} />
-        {tooltip && (
-          <div
-            className="absolute pointer-events-none z-10 px-2 py-1.5 rounded-lg bg-gray-900 border border-gray-700 text-xs text-gray-200 shadow-xl"
-            style={{ left: Math.min(tipPos.x + 14, 480), top: Math.max(tipPos.y - 42, 4) }}
-          >
-            <div className="font-semibold text-white mb-0.5">{tooltip.name}</div>
-            <div className="text-gray-400">CV: {tooltip.cv}</div>
-            <div className="text-gray-500 mt-0.5 max-w-[190px] leading-tight">{tooltip.note}</div>
-          </div>
-        )}
-      </div>
-
-      {/* Controls */}
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button onClick={onToggle}
-          className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-white transition-colors">
-          {isPlaying ? 'Pause' : 'Play'}
-        </button>
-        <button onClick={() => stepToStage(-1)}
-          className="px-3 py-1.5 rounded-lg text-xs border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
-          title="Previous stage boundary">
-          ← Stage
-        </button>
-        <button onClick={() => stepToStage(1)}
-          className="px-3 py-1.5 rounded-lg text-xs border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
-          title="Next stage boundary">
-          Stage →
-        </button>
-        <button onClick={() => onScrub(0)}
-          className="px-3 py-1.5 rounded-lg text-xs border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors">
-          Reset
-        </button>
-
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-500">Speed</span>
-          {[0.5, 1, 2].map(s => (
-            <button key={s} onClick={() => onSpeedChange(s)}
-              className={`px-2 py-1 rounded text-xs border transition-colors ${
-                speedMult === s
-                  ? 'border-cyan-500 bg-cyan-950/40 text-cyan-300'
-                  : 'border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-400'
-              }`}>
-              {s}×
-            </button>
-          ))}
-        </div>
-
-        {stage && (
-          <span className="text-xs font-mono ml-auto" style={{ color: stage.color ? `rgb(${stage.color.join(',')})` : '#9ca3af' }}>
-            {['av','diastole'].includes(stage.id) ? stage.stageNum : `Stage ${stage.stageNum}`}
-            {' — '}{stage.ecgPart}
-          </span>
-        )}
-      </div>
-
-      {/* Scrubable timeline */}
-      <div className="mt-1.5 relative">
-        <input type="range" min={0} max={cycleMs||CYCLE_MS} value={masterTimeMs}
-          onChange={e => onScrub(Number(e.target.value))}
-          className="w-full accent-cyan-500" />
-        <div className="relative h-5 mt-0.5">
-          {[
-            { label:'P',       t:0   },
-            { label:'AV',      t:80  },
-            { label:'QRS',     t:180 },
-            { label:'ST',      t:260 },
-            { label:'T',       t:380 },
-            { label:'Diastole',t:540 },
-          ].map(({ label, t }) => (
-            <button key={label} onClick={() => onScrub(t)}
-              className="absolute text-gray-600 hover:text-cyan-400 transition-colors"
-              style={{ fontSize:'9px', left:`${(t/(cycleMs||CYCLE_MS))*100}%`, transform:'translateX(-50%)' }}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-3 flex gap-3 text-xs text-gray-500">
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{background:'#F5C518'}} /> Depolarized
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{background:'#87CEEB'}} /> Repolarizing
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{background:'#888888'}} /> Resting
-        </span>
-        <span className="ml-auto text-gray-600">Hover chambers for conduction velocity</span>
-      </div>
-    </div>
-  )
-}
-
 // ── Layout helpers ─────────────────────────────────────────────────────────
 function CanvasWrap({ containerRef, children }) {
   return (
@@ -1135,7 +473,20 @@ function APPanel({ panelKey, title, sub, data, phases, isSelected, onHover }) {
       const toY = (v) => AP_PAD.t + (AP_VMAX - v) / (AP_VMAX - AP_VMIN) * dH
 
       const sketch = (p) => {
-        p.setup = () => { p.createCanvas(W, AP_H) }
+        p.setup = () => {
+          const cnv = p.createCanvas(W, AP_H)
+          cnv.elt.style.width = '100%'
+          cnv.elt.style.height = 'auto'
+          cnv.elt.style.display = 'block'
+          // Backing buffer must have enough real pixels for the CSS-stretched
+          // display size (plus device pixel ratio) or the upscale looks blurry.
+          const rectW = cnv.elt.getBoundingClientRect().width || W
+          const density = Math.min(3, Math.max(1, rectW / W) * (window.devicePixelRatio || 1))
+          p.pixelDensity(density)
+          cnv.elt.style.width = '100%'
+          cnv.elt.style.height = 'auto'
+          cnv.elt.style.display = 'block'
+        }
         p.draw = () => {
           p.background(17, 24, 39)
 
@@ -1291,9 +642,10 @@ function ActionPotentials({ selectedKey }) {
 }
 
 // ── 2C: Conduction Animation ───────────────────────────────────────────────
-function ConductionSection({ clockRef, rhythm, conductionMap, masterTimeMs, isPlaying, onToggle, onScrub, onStep, speedMult, onSpeedChange }) {
+function ConductionSection({ clockRef, rhythm, conductionMap, masterTimeMs, isPlaying, onToggle, onScrub, onStep }) {
   const tMs = masterTimeMs
   const cycleMs = rhythm.cycleMs || CYCLE_MS
+  const [showVector, setShowVector] = useState(false)
 
   const { structName, cv, note } = useMemo(() => {
     if (!conductionMap || conductionMap.length === 0)
@@ -1325,12 +677,21 @@ function ConductionSection({ clockRef, rhythm, conductionMap, masterTimeMs, isPl
     <div>
       <div className="flex gap-4 items-start mb-4">
         {/* Heart animation */}
-        <div className="rounded-xl border border-gray-800 overflow-hidden shrink-0">
+        <div className="relative rounded-xl border border-gray-800 overflow-hidden shrink-0">
           <HeartAnimation
             clockRef={clockRef}
-            rhythmId="normalSinus"
+            rhythmId="normalSinusVoltage"
             rhythm={rhythm}
           />
+          {showVector && (
+            <CardiacVectorOverlay
+              clockRef={clockRef}
+              waves={rhythm.waves}
+              cycleMs={cycleMs}
+              width={280}
+              height={330}
+            />
+          )}
         </div>
 
         {/* Side panel */}
@@ -1381,6 +742,16 @@ function ConductionSection({ clockRef, rhythm, conductionMap, masterTimeMs, isPl
         >
           Reset
         </button>
+        <button
+          onClick={() => setShowVector(v => !v)}
+          className={`px-4 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+            showVector
+              ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/50'
+              : 'bg-gray-800 text-gray-500 border-gray-700 hover:text-gray-300'
+          }`}
+        >
+          Cardiac vector {showVector ? 'ON' : 'OFF'}
+        </button>
         <input
           type="range"
           min={0}
@@ -1391,233 +762,105 @@ function ConductionSection({ clockRef, rhythm, conductionMap, masterTimeMs, isPl
         />
         <span className="text-xs font-mono text-gray-500 tabular-nums w-20">{tMs} / {cycleMs} ms</span>
       </div>
-
-      <DepolarizationSequence
-        masterTimeMs={masterTimeMs}
-        cycleMs={rhythm.cycleMs}
-        waves={rhythm.waves}
-        onScrub={onScrub}
-        isPlaying={isPlaying}
-        onToggle={onToggle}
-        speedMult={speedMult}
-        onSpeedChange={onSpeedChange}
-      />
     </div>
   )
 }
 
-// ── 2D: Wavefront Dipole ───────────────────────────────────────────────────
-function WavefrontDipole({ clockRef, waves, cycleMs, conductionMap, currentTimeMs }) {
-  const containerRef = useRef()
-  const p5InstRef = useRef(null)
-  const dataRef = useRef({ waves, cycleMs, conductionMap, currentTimeMs })
+function gaussianV(t, amplitude, center, sigma) {
+  return amplitude * Math.exp(-((t - center) ** 2) / (2 * sigma ** 2))
+}
+function projFactor(sourceAxisDeg, leadAxisDeg) {
+  return Math.cos(((sourceAxisDeg - leadAxisDeg) * Math.PI) / 180)
+}
+// Same delay applied to the ventricular animation (HeartAnimation's
+// normalSinusVoltage continuousDelay) so the vector's QRS-driven spike stays
+// in sync with the now-delayed ventricular sweep instead of leading it —
+// only Q/R/S are shifted; P and T keep their own natural timing.
+const VENTRICLE_VECTOR_DELAY_MS = 40
+function delayedVoltage(t, waves, leadAxisDeg) {
+  return waves.reduce((sum, wave) => {
+    const delay = (wave.name === 'Q' || wave.name === 'R' || wave.name === 'S') ? VENTRICLE_VECTOR_DELAY_MS : 0
+    const axis = wave.axisDeg ?? 0
+    return sum + gaussianV(t - delay, wave.amplitude, wave.center, wave.sigma) * projFactor(axis, leadAxisDeg)
+  }, 0)
+}
+
+// ── Cardiac vector overlay — toggleable, drawn on top of the real heart SVG ──
+// Anchor point and SCALE are first-draft estimates for where the ventricular
+// mass sits within HeartAnimation's rendered box — nudge these after seeing
+// it rendered if the arrow doesn't sit where expected.
+function CardiacVectorOverlay({ clockRef, waves, cycleMs, width = 280, height = 330 }) {
+  const canvasRef = useRef(null)
 
   useEffect(() => {
-    dataRef.current = { waves, cycleMs, conductionMap, currentTimeMs }
-    p5InstRef.current?.redraw()
-  }, [waves, cycleMs, conductionMap, currentTimeMs])
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = width * dpr
+    canvas.height = height * dpr
+    ctx.scale(dpr, dpr)
 
-  useEffect(() => {
-    const W = 520, H = 300
-    // Heart schematic geometry
-    const CX = 180, CY = 145  // center of heart
-    const OX = 390, OY = 175  // dipole arrow origin
-    const SCALE = 90
+    const anchorX = width * 0.52
+    const anchorY = height * 0.62
+    const SCALE = 34
 
-    const sketch = (p) => {
-      p.setup = () => {
-        p.createCanvas(W, H)
-        p.noLoop()
+    let rafId
+    const frame = () => {
+      const { tInCycle } = clockRef.current
+      ctx.clearRect(0, 0, width, height)
+
+      if (waves && waves.length > 0) {
+        const Vx = delayedVoltage(tInCycle, waves, 0)
+        const Vy = delayedVoltage(tInCycle, waves, 90)
+        const mag = Math.hypot(Vx, Vy)
+
+        if (mag > 0.02) {
+          const tipX = anchorX + Vx * SCALE
+          const tipY = anchorY + Vy * SCALE
+          ctx.strokeStyle = '#34d399'
+          ctx.fillStyle = '#34d399'
+          ctx.lineWidth = 2.5
+          ctx.lineCap = 'round'
+          ctx.shadowColor = '#34d399'
+          ctx.shadowBlur = 8
+          ctx.beginPath()
+          ctx.moveTo(anchorX, anchorY)
+          ctx.lineTo(tipX, tipY)
+          ctx.stroke()
+          ctx.shadowBlur = 0
+
+          const angle = Math.atan2(tipY - anchorY, tipX - anchorX)
+          const hLen = 9
+          ctx.beginPath()
+          ctx.moveTo(tipX, tipY)
+          ctx.lineTo(tipX - hLen * Math.cos(angle - 0.4), tipY - hLen * Math.sin(angle - 0.4))
+          ctx.lineTo(tipX - hLen * Math.cos(angle + 0.4), tipY - hLen * Math.sin(angle + 0.4))
+          ctx.closePath()
+          ctx.fill()
+        }
+
+        ctx.beginPath()
+        ctx.arc(anchorX, anchorY, 3, 0, Math.PI * 2)
+        ctx.fillStyle = 'rgba(52,211,153,0.6)'
+        ctx.fill()
       }
 
-      p.draw = () => {
-        p.background(17, 24, 39)
-        const { waves: w, cycleMs: cm, conductionMap: cmap, currentTimeMs: tMs } = dataRef.current
-
-        const isActive = (id) => {
-          if (!cmap) return false
-          return cmap.some(e => e.id === id && tMs >= e.onsetMs && tMs < e.offsetMs && e.state !== 'meta')
-        }
-
-        const getColor = (ids) => {
-          // depolarizing = blue, resting = dark warm
-          const active = ids.some(id => isActive(id))
-          if (active) return [59, 130, 246]
-          return [55, 30, 30]
-        }
-
-        // ── Heart schematic ──
-        // Left panel label
-        p.noStroke()
-        p.fill(100, 116, 139)
-        p.textSize(8)
-        p.textAlign(p.CENTER)
-        p.text('Heart (schematic)', CX, 14)
-
-        // Atria region
-        const atriaColor = getColor(['ra', 'la', 'sa', 'bachmann'])
-        p.fill(...atriaColor, 200)
-        p.stroke(80, 80, 80)
-        p.strokeWeight(1)
-        p.ellipse(CX, CY - 55, 90, 55)
-        p.noStroke()
-        p.fill(180, 180, 180)
-        p.textSize(7)
-        p.textAlign(p.CENTER)
-        p.text('Atria', CX, CY - 52)
-
-        // RV (viewer left) — smaller
-        const rvColor = getColor(['rv'])
-        p.fill(...rvColor, 200)
-        p.stroke(80, 80, 80)
-        p.strokeWeight(1)
-        p.ellipse(CX - 42, CY + 28, 65, 90)
-
-        // LV (viewer right) — larger
-        const lvColor = getColor(['lv', 'apex'])
-        p.fill(...lvColor, 200)
-        p.stroke(80, 80, 80)
-        p.strokeWeight(1)
-        p.ellipse(CX + 38, CY + 28, 85, 110)
-
-        // Septum
-        const sepColor = getColor(['lbundle', 'rbundle', 'his'])
-        p.fill(...sepColor, 200)
-        p.ellipse(CX, CY + 28, 22, 70)
-
-        // Labels
-        p.noStroke()
-        p.fill(200, 200, 200)
-        p.textSize(7)
-        p.textAlign(p.CENTER)
-        p.text('RV', CX - 42, CY + 32)
-        p.text('LV', CX + 38, CY + 32)
-        p.fill(100, 116, 139)
-        p.text('(P-right)', CX - 42, CY + 44)
-        p.text('(P-left)', CX + 38, CY + 44)
-
-        // AV node dot
-        if (isActive('av')) {
-          p.fill(139, 92, 246)
-          p.ellipse(CX, CY - 18, 10, 10)
-        }
-
-        // Repol overlay (amber) for repolLV / repolRV
-        const repolLVActive = isActive('repolLV')
-        const repolRVActive = isActive('repolRV')
-        if (repolLVActive) {
-          p.fill(245, 158, 11, 90)
-          p.noStroke()
-          p.ellipse(CX + 38, CY + 28, 85, 110)
-        }
-        if (repolRVActive) {
-          p.fill(245, 158, 11, 90)
-          p.noStroke()
-          p.ellipse(CX - 42, CY + 28, 65, 90)
-        }
-
-        // ── Cardiac vector ──
-        const Vx = (w && cm) ? ECGVoltage(tMs, cm, w, 0) : 0
-        const Vy = (w && cm) ? ECGVoltage(tMs, cm, w, 90) : 0
-        const mag = Math.sqrt(Vx * Vx + Vy * Vy)
-
-        // Right panel background
-        p.fill(22, 30, 46)
-        p.noStroke()
-        p.rect(290, 20, 220, 260, 8)
-
-        p.noStroke()
-        p.fill(100, 116, 139)
-        p.textSize(8)
-        p.textAlign(p.CENTER)
-        p.text('Cardiac Dipole Vector', OX, 40)
-
-        // Axis cross
-        p.stroke(50, 60, 80)
-        p.strokeWeight(0.8)
-        p.line(OX - 90, OY, OX + 90, OY)
-        p.line(OX, OY - 90, OX, OY + 90)
-        p.noStroke()
-        p.fill(70, 80, 100)
-        p.textSize(7)
-        p.textAlign(p.CENTER)
-        p.text('I (→)', OX + 94, OY + 3)
-        p.text('aVF (↓)', OX, OY + 100)
-
-        // Arrow
-        if (mag > 0.005) {
-          const ax = Vx * SCALE, ay = Vy * SCALE
-          p.stroke(52, 211, 153)
-          p.strokeWeight(2)
-          p.line(OX, OY, OX + ax, OY + ay)
-          // Arrowhead
-          const angle = Math.atan2(ay, ax)
-          const hLen = 8
-          p.fill(52, 211, 153)
-          p.noStroke()
-          p.triangle(
-            OX + ax, OY + ay,
-            OX + ax - hLen * Math.cos(angle - 0.4), OY + ay - hLen * Math.sin(angle - 0.4),
-            OX + ax - hLen * Math.cos(angle + 0.4), OY + ay - hLen * Math.sin(angle + 0.4)
-          )
-        }
-
-        // Origin dot
-        p.fill(200, 200, 200)
-        p.noStroke()
-        p.circle(OX, OY, 5)
-
-        // Vector readout
-        p.fill(180, 190, 200)
-        p.textSize(8)
-        p.textAlign(p.LEFT)
-        p.text(`Vx (Lead I):  ${Vx.toFixed(3)} mV`, 300, 80)
-        p.text(`Vy (aVF):     ${Vy.toFixed(3)} mV`, 300, 92)
-        const deg = (Math.atan2(Vy, Vx) * 180 / Math.PI).toFixed(0)
-        p.text(`Axis:          ${deg}°`, 300, 104)
-        p.text(`|V|:           ${mag.toFixed(3)} mV`, 300, 116)
-
-        // Time readout — left panel, below heart schematic
-        p.fill(100, 116, 139)
-        p.textSize(7)
-        p.textAlign(p.LEFT)
-        p.text(`t = ${Math.round(tMs)} ms`, 8, H - 10)
-
-        // Annotation — right panel bottom
-        p.fill(103, 232, 249)
-        p.textSize(7)
-        p.textAlign(p.CENTER)
-        p.text('The −/+ boundary = dipole (Module 1 §1B)', OX, H - 10)
-      }
+      rafId = requestAnimationFrame(frame)
     }
-
-    const container = containerRef.current
-    if (!container) return
-    let inst
-    const rafId = requestAnimationFrame(() => {
-      if (!container.isConnected) return
-      while (container.firstChild) container.removeChild(container.firstChild)
-      inst = new p5(sketch, container)
-      p5InstRef.current = inst
-    })
-    return () => {
-      cancelAnimationFrame(rafId)
-      p5InstRef.current = null
-      if (inst) { try { inst.remove() } catch (_) {} }
-      while (container.firstChild) container.removeChild(container.firstChild)
-    }
-  }, [])  // mount once — data comes in via dataRef + redraw()
+    rafId = requestAnimationFrame(frame)
+    return () => cancelAnimationFrame(rafId)
+  }, [clockRef, waves, cycleMs, width, height])
 
   return (
-    <CanvasWrap containerRef={containerRef}>
-      <SimBar>
-        <span>Green arrow = net cardiac dipole vector · synchronized with master clock · blue = depolarizing · amber = repolarizing</span>
-      </SimBar>
-    </CanvasWrap>
+    <canvas
+      ref={canvasRef}
+      style={{ position: 'absolute', inset: 0, width, height, pointerEvents: 'none' }}
+    />
   )
 }
 
-// ── 2E: Cardiac Vector Cycle ───────────────────────────────────────────────
+// ── 2D: Cardiac Vector Cycle ───────────────────────────────────────────────
 function VectorCycle({ clockRef, waves, cycleMs, currentTimeMs }) {
   const containerRef = useRef()
   const p5InstRef = useRef(null)
@@ -1669,7 +912,18 @@ function VectorCycle({ clockRef, waves, cycleMs, currentTimeMs }) {
       }
 
       p.setup = () => {
-        p.createCanvas(W, H)
+        const cnv = p.createCanvas(W, H)
+        cnv.elt.style.width = '100%'
+        cnv.elt.style.height = 'auto'
+        cnv.elt.style.display = 'block'
+        // Backing buffer must have enough real pixels for the CSS-stretched
+        // display size (plus device pixel ratio) or the upscale looks blurry.
+        const rectW = cnv.elt.getBoundingClientRect().width || W
+        const density = Math.min(3, Math.max(1, rectW / W) * (window.devicePixelRatio || 1))
+        p.pixelDensity(density)
+        cnv.elt.style.width = '100%'
+        cnv.elt.style.height = 'auto'
+        cnv.elt.style.display = 'block'
         p.noLoop()  // driven by redraw() calls, not the internal 60fps loop
       }
 
@@ -1881,9 +1135,7 @@ export default function CardiacBridge() {
   const [masterTimeMs, setMasterTimeMs] = useState(0)
   const isPlayingRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [speedMult, setSpeedMult] = useState(1)
   const speedMultRef = useRef(1)
-  const handleSpeedChange = useCallback((s) => { speedMultRef.current = s; setSpeedMult(s) }, [])
 
   useEffect(() => {
     let lastTs = null, raf
@@ -1963,7 +1215,7 @@ export default function CardiacBridge() {
       <Section
         label="2C"
         title="Conduction Animation"
-        subtitle="Watch depolarization propagate through the conduction system in real time. Use the scrubber to move to any point in the cardiac cycle."
+        subtitle="Watch depolarization propagate through the conduction system in real time. Use the scrubber to move to any point in the cardiac cycle, and toggle the cardiac vector to see the net dipole this wavefront produces at each instant."
       >
         <ConductionSection
           clockRef={masterClockRef}
@@ -1974,38 +1226,23 @@ export default function CardiacBridge() {
           onToggle={togglePlay}
           onScrub={handleScrub}
           onStep={handleStep}
-          speedMult={speedMult}
-          onSpeedChange={handleSpeedChange}
         />
         <Callout>
           The AV node is the rate-limiting step at 0.05 m/s — 20× slower than atrial muscle.
           Once past the AV node, the His-Purkinje system accelerates conduction 40–80× faster than myocardium,
           delivering simultaneous endocardial activation across both ventricles.
         </Callout>
-      </Section>
-
-      <Section
-        label="2D"
-        title="From Wavefront to Cardiac Dipole"
-        subtitle="The boundary between depolarized (blue) and resting tissue creates a dipole vector — identical to the dipole model from Module 1. The green arrow is the net cardiac vector at each moment."
-      >
-        <WavefrontDipole
-          clockRef={masterClockRef}
-          waves={rhythm.waves}
-          cycleMs={rhythm.cycleMs}
-          conductionMap={conductionMap}
-          currentTimeMs={masterTimeMs}
-        />
         <Callout>
-          During QRS, the depolarization wavefront sweeps left and inferiorly (toward the dominant LV mass).
-          This is why the normal axis is +60°. During repolarization (T wave), the wave travels
-          epicardium→endocardium (opposite to depolarization), but still produces the same polarity deflection
-          in most leads because the gradient is reversed.
+          The boundary between depolarized and resting tissue creates a dipole vector — identical to the
+          dipole model from Module 1. During QRS, the depolarization wavefront sweeps left and inferiorly
+          (toward the dominant LV mass), which is why the normal axis is +60°. During repolarization (T wave),
+          the wave travels epicardium→endocardium (opposite to depolarization), but still produces the same
+          polarity deflection in most leads because the gradient is reversed.
         </Callout>
       </Section>
 
       <Section
-        label="2E"
+        label="2D"
         title="Cardiac Vector Cycle"
         subtitle="The cardiac vector rotates through different angles during P, QRS, and T. The projection onto each lead axis determines that lead's deflection — positive projection → upward deflection."
       >

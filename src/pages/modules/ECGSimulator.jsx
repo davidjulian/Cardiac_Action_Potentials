@@ -8,9 +8,9 @@ import {
 } from '../../lib/ECGEngine'
 
 // ── Canvas config ─────────────────────────────────────────────────────────────
-const CW = 820, CH = 220
+const CW = 820, CH = 280
 const PX_MS = 0.20     // horizontal: px per ms of trace
-const PX_MV = 65       // vertical:   px per mV of signal
+const PX_MV = 83       // vertical:   px per mV of signal
 const BL    = 0.58     // baseline y-fraction (0 mV position)
 
 const EMERALD    = '#10b981'
@@ -316,12 +316,14 @@ export default function ECGSimulator() {
             )}
           </div>
         </div>
-        <div className="flex gap-4 items-start">
+        <div className="flex gap-4 items-center">
           <HeartAnimation
             clockRef={heartClockRef}
             rhythmId={rhythmId}
             rhythm={animRhythm}
             className="shrink-0"
+            width={210}
+            height={247}
           />
           <div className="flex-1 min-w-0">
             <canvas ref={canvasRef} width={CW} height={CH} className="w-full rounded-lg"

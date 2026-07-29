@@ -155,6 +155,11 @@ export default function LeadPlacementLab() {
   const angleRef    = useRef(null)
   const dotRef      = useRef(null)
   const projRef     = useRef(null)
+  const vPlusRef    = useRef(null)
+  const vMinusRef   = useRef(null)
+  const scrubRef      = useRef(null)
+  const scrubLabelRef = useRef(null)
+  const scrubbingRef  = useRef(false)
 
   // Electrode positions (mutable ref — no re-render on drag)
   const elec = useRef({
@@ -194,9 +199,16 @@ export default function LeadPlacementLab() {
       if (lastTsRef.current === null) lastTsRef.current = ts
       const dtReal = ts - lastTsRef.current
       lastTsRef.current = ts
-      if (playingRef.current) simTimeRef.current += dtReal * speedRef.current
+      if (playingRef.current && !scrubbingRef.current) simTimeRef.current += dtReal * speedRef.current
       const elapsed = simTimeRef.current
-      const tMs = elapsed % cycleMs
+      const tMs = ((elapsed % cycleMs) + cycleMs) % cycleMs
+
+      // Keep the scrub slider's thumb following playback, unless the user is
+      // actively dragging it (in which case its own onChange drives simTimeRef).
+      if (!scrubbingRef.current) {
+        if (scrubRef.current) scrubRef.current.value = String(Math.round(tMs))
+      }
+      if (scrubLabelRef.current) scrubLabelRef.current.textContent = `${Math.round(tMs)} / ${Math.round(cycleMs)} ms`
 
       const { plus, minus } = elec.current
       const dx = plus.x - minus.x
@@ -209,8 +221,14 @@ export default function LeadPlacementLab() {
       const Vx = ECGVoltage(tMs, cycleMs, waves, 0,  nativeCycleMs)
       const Vy = ECGVoltage(tMs, cycleMs, waves, 90, nativeCycleMs)
 
-      // Dot product = projection of cardiac vector onto lead axis
+      // Dot product = projection of cardiac vector onto lead axis. This is the
+      // voltage the lead actually records; we present it to the student as a
+      // difference between two electrode readings (split symmetrically around
+      // the body's electrical center) so it's clear ΔV = V(+) − V(−) is what
+      // drives the trace, not some abstract unexplained number.
       const dotProd = Vx * ux + Vy * uy
+      const vPlus = dotProd / 2
+      const vMinus = -dotProd / 2
 
       // Angle between cardiac vector and lead axis
       const vMag   = Math.sqrt(Vx * Vx + Vy * Vy)
@@ -322,6 +340,14 @@ export default function LeadPlacementLab() {
         bCtx.moveTo(foot.x - perpLen * uy, foot.y + perpLen * ux)
         bCtx.lineTo(foot.x + perpLen * uy, foot.y - perpLen * ux)
         bCtx.stroke()
+
+        // ΔV label on the projected segment itself, so the number is tied
+        // directly to the visual segment that represents it.
+        const midX = (orig.x + foot.x) / 2, midY = (orig.y + foot.y) / 2
+        bCtx.fillStyle = projColor
+        bCtx.font = 'bold 11px monospace'
+        bCtx.textAlign = 'center'
+        bCtx.fillText(`ΔV = ${dotProd.toFixed(2)} mV`, midX - 14 * uy, midY + 14 * ux)
       }
 
       // ── Electrodes ─────────────────────────────────────────────────────
@@ -343,16 +369,20 @@ export default function LeadPlacementLab() {
       drawElectrode(plus,  '+', '#3b82f6')
       drawElectrode(minus, '−', '#f59e0b')
 
-      // Electrode labels
-      bCtx.font      = '10px monospace'
-      bCtx.fillStyle = '#64748b'
+      // Per-electrode voltage readout — the actual numbers being differenced
+      // to produce ΔV, shown right at the electrode that reads them.
+      bCtx.font      = 'bold 10px monospace'
       bCtx.textAlign = 'center'
-      bCtx.fillText('(+)', plus.x, plus.y + 22)
-      bCtx.fillText('(−)', minus.x, minus.y + 22)
+      bCtx.fillStyle = '#60a5fa'
+      bCtx.fillText(`${vPlus >= 0 ? '+' : ''}${vPlus.toFixed(2)} mV`, plus.x, plus.y + 24)
+      bCtx.fillStyle = '#fbbf24'
+      bCtx.fillText(`${vMinus >= 0 ? '+' : ''}${vMinus.toFixed(2)} mV`, minus.x, minus.y + 24)
 
       // ── Live info panel update ──────────────────────────────────────────
       if (angleRef.current)  angleRef.current.textContent  = `${thetaDeg.toFixed(1)}°`
       if (dotRef.current)    dotRef.current.textContent    = dotProd.toFixed(3) + ' mV'
+      if (vPlusRef.current)  vPlusRef.current.textContent  = `${vPlus >= 0 ? '+' : ''}${vPlus.toFixed(3)} mV`
+      if (vMinusRef.current) vMinusRef.current.textContent = `${vMinus >= 0 ? '+' : ''}${vMinus.toFixed(3)} mV`
       if (projRef.current) {
         const percent = (Math.abs(cosTheta) * 100).toFixed(0)
         projRef.current.textContent = `${percent}% of max`
@@ -434,7 +464,8 @@ export default function LeadPlacementLab() {
             <p className="text-xs text-gray-400 leading-relaxed max-w-lg">
               Drag the <span className="text-blue-400 font-semibold">+ (positive)</span> and{' '}
               <span className="text-amber-400 font-semibold">− (negative)</span> electrodes anywhere
-              on the body. The ECG strip updates in real time based on the{' '}
+              on the body. Each electrode reads its own voltage (shown right below it); the ECG
+              strip plots <span className="text-white">ΔV = V(+) − V(−)</span>, the{' '}
               <span className="text-white">dot product</span> of the cardiac vector with your lead axis.
             </p>
           </div>
@@ -483,6 +514,28 @@ export default function LeadPlacementLab() {
         </div>
       </div>
 
+      {/* Scrub through the cardiac cycle */}
+      <div className="px-5 py-2.5 border-b border-gray-800 flex items-center gap-3">
+        <span className="text-xs uppercase tracking-widest text-gray-600 shrink-0">Scrub</span>
+        <input
+          ref={scrubRef}
+          type="range"
+          min={0}
+          max={Math.round(RHYTHM.cycleMs)}
+          defaultValue={0}
+          step={1}
+          onMouseDown={() => { scrubbingRef.current = true; setPlaying(false) }}
+          onTouchStart={() => { scrubbingRef.current = true; setPlaying(false) }}
+          onMouseUp={() => { scrubbingRef.current = false }}
+          onTouchEnd={() => { scrubbingRef.current = false }}
+          onChange={e => { simTimeRef.current = Number(e.target.value) }}
+          className="flex-1 min-w-[120px] accent-cyan-500"
+        />
+        <span ref={scrubLabelRef} className="text-xs font-mono text-gray-500 tabular-nums w-28 text-right">
+          0 / {Math.round(RHYTHM.cycleMs)} ms
+        </span>
+      </div>
+
       <div className="flex gap-0">
         {/* Body canvas */}
         <div className="relative">
@@ -525,9 +578,15 @@ export default function LeadPlacementLab() {
               <p ref={angleRef} className="text-lg font-bold font-mono text-white tabular-nums">—</p>
               <p className="text-xs text-gray-600">between dipole &amp; lead axis</p>
             </div>
+            <div className="rounded-lg bg-gray-900/70 border border-gray-800 px-2.5 py-2">
+              <p className="text-xs text-gray-500 mb-1">Electrode voltages</p>
+              <p className="text-xs font-mono tabular-nums"><span className="text-blue-400">V(+)</span> <span ref={vPlusRef} className="text-blue-300">—</span></p>
+              <p className="text-xs font-mono tabular-nums"><span className="text-amber-400">V(−)</span> <span ref={vMinusRef} className="text-amber-300">—</span></p>
+            </div>
             <div>
-              <p className="text-xs text-gray-500 mb-0.5">Projected voltage</p>
+              <p className="text-xs text-gray-500 mb-0.5">ΔV = V(+) − V(−)</p>
               <p ref={dotRef} className="text-lg font-bold font-mono text-blue-400 tabular-nums">—</p>
+              <p className="text-xs text-gray-600">this is what the ECG plots</p>
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-0.5">Efficiency</p>
