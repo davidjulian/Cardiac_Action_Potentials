@@ -2,7 +2,8 @@
 import p5 from 'p5'
 import ModulePage from '../../components/ModulePage'
 import HeartAnimation, { buildConductionMap } from '../../components/HeartAnimation'
-import { ECGVoltage, buildRhythmFromParams } from '../../lib/ECGEngine'
+import { ECGVoltage, buildRhythmFromParams, meanQRSAxis } from '../../lib/ECGEngine'
+import { AxisSummaryPanel } from '../../components/MeanAxisPanel'
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const CYCLE_MS = 800
@@ -1007,6 +1008,31 @@ function VectorCycle({ clockRef, waves, cycleMs, currentTimeMs }) {
             VCX + ax - hLen * Math.cos(angle + 0.4), VCY + ay - hLen * Math.sin(angle + 0.4)
           )
         }
+        // Mean QRS axis arrow — bold, bright yellow, distinct from the
+        // rotating emerald instantaneous vector above.
+        if (w && w.length > 0) {
+          const { angleDeg: meanAngle, leadINet, leadAVFNet } = meanQRSAxis(w)
+          const meanMag = Math.min(1, Math.hypot(leadINet, leadAVFNet))
+          const meanRad = (meanAngle * Math.PI) / 180
+          const max = Math.cos(meanRad) * meanMag * VR
+          const may = Math.sin(meanRad) * meanMag * VR
+          p.stroke(250, 204, 21)
+          p.strokeWeight(3.5)
+          p.line(VCX, VCY, VCX + max, VCY + may)
+          const mhLen = 9
+          p.fill(250, 204, 21)
+          p.noStroke()
+          p.triangle(
+            VCX + max, VCY + may,
+            VCX + max - mhLen * Math.cos(meanRad - 0.4), VCY + may - mhLen * Math.sin(meanRad - 0.4),
+            VCX + max - mhLen * Math.cos(meanRad + 0.4), VCY + may - mhLen * Math.sin(meanRad + 0.4)
+          )
+          p.fill(250, 204, 21)
+          p.textSize(7)
+          p.textAlign(p.CENTER)
+          p.text(`Mean QRS Axis ${meanAngle >= 0 ? '+' : ''}${meanAngle.toFixed(0)}°`, VCX, VCY + VR + 16)
+        }
+
         p.fill(200, 200, 200)
         p.noStroke()
         p.circle(VCX, VCY, 5)
@@ -1131,6 +1157,8 @@ export default function CardiacBridge() {
     [rhythm.waves]
   )
 
+  const axis = useMemo(() => meanQRSAxis(rhythm.waves), [rhythm.waves])
+
   const masterClockRef = useRef({ tInCycle: 0, cycleMs: CYCLE_MS, nativeCycleMs: null, elapsedMs: 0 })
   const [masterTimeMs, setMasterTimeMs] = useState(0)
   const isPlayingRef = useRef(false)
@@ -1252,6 +1280,9 @@ export default function CardiacBridge() {
           cycleMs={rhythm.cycleMs}
           currentTimeMs={masterTimeMs}
         />
+        <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 mb-3">
+          <AxisSummaryPanel angleDeg={axis.angleDeg} leadIMm={axis.leadIMm} leadAVFMm={axis.leadAVFMm} />
+        </div>
         <Callout>
           Lead II (60°) is aligned with the normal axis and shows the tallest P wave and R wave.
           Lead I (0°) projects the leftward component. aVR (−150°) is always negative in a normal heart

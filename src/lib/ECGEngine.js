@@ -827,6 +827,45 @@ export function measureIntervals(waves) {
   }
 }
 
+// ─── Mean QRS axis ──────────────────────────────────────────────────────────
+// Standard clinical bedside method: net QRS deflection in Lead I and aVF,
+// then axis = arctan(aVF/I), quadrant-corrected via atan2. Each wave's own
+// amplitude/axisDeg already encodes its direction, so "net deflection in a
+// lead" is just the sum of each QRS wave's amplitude projected onto that
+// lead's axis — the same projection cycleVoltage() uses, evaluated at each
+// wave's own peak rather than swept over time.
+const MM_PER_MV = 10   // standard ECG paper convention (10mm = 1mV)
+
+export function netQRSAmplitude(waves, leadAxisDeg) {
+  return waves
+    .filter(w => w.name === 'Q' || w.name === 'R' || w.name === 'S')
+    .reduce((sum, w) => sum + w.amplitude * projectionFactor(w.axisDeg, leadAxisDeg), 0)
+}
+
+export function meanQRSAxis(waves) {
+  const leadINet   = netQRSAmplitude(waves, LEADS.I.axisDeg)
+  const leadAVFNet = netQRSAmplitude(waves, LEADS.aVF.axisDeg)
+  const angleDeg = (leadINet === 0 && leadAVFNet === 0)
+    ? 0
+    : Math.atan2(leadAVFNet, leadINet) * 180 / Math.PI
+  return {
+    angleDeg,
+    leadINet,
+    leadAVFNet,
+    leadIMm:   leadINet * MM_PER_MV,
+    leadAVFMm: leadAVFNet * MM_PER_MV,
+  }
+}
+
+// Normal: -30° to +90°. Left: <-30° down to -90°. Right: +90° to +180°.
+// Extreme ("northwest axis"): the remaining (-180°, -90°) wedge.
+export function classifyAxis(angleDeg) {
+  if (angleDeg >= -30 && angleDeg <= 90) return 'normal'
+  if (angleDeg < -30 && angleDeg >= -90) return 'left'
+  if (angleDeg > 90 && angleDeg <= 180)  return 'right'
+  return 'extreme'
+}
+
 // Legacy constant — kept for any imports that reference it directly
 export const NORMAL_SINUS_WAVES = buildWaveArray(RHYTHM_PRESETS.normalSinus)
 export const DEFAULT_HEART_RATE_BPM = 75
@@ -835,6 +874,16 @@ export const DEFAULT_HEART_RATE_BPM = 75
 // Translates ECGSimulator's parameter controls → {waves, cycleMs, nativeCycleMs}.
 // Lets students derive any rhythm by understanding which parameters produce it,
 // rather than selecting a pre-labelled preset.
+// Auto-mode wide-QRS axis deviation targets — chosen so each lands solidly
+// inside its own classifyAxis() zone once fully deviated (widenProgress=1).
+const AXIS_TARGETS = { left: -45, right: 100, extreme: -110 }
+
+function lerp(a, b, t) { return a + (b - a) * t }
+function smoothstep(t) {
+  const c = Math.max(0, Math.min(1, t))
+  return c * c * (3 - 2 * c)
+}
+
 export function buildRhythmFromParams(ui) {
   const {
     saNodeRate        = 75,
@@ -844,22 +893,33 @@ export function buildRhythmFromParams(ui) {
     qtInterval        = 380,
     pWaveMode         = 'present',
     escapeRhythm      = 'none',
+    axisOverrideDeg   = null,
+    qrsAxisPattern    = 'left',
   } = ui
 
-  const PP     = 60000 / saNodeRate
-  const isWide = qrsDuration > 120
+  const PP = 60000 / saNodeRate
+
+  // Continuous (not step) wide-QRS deviation: 0 at qrsDuration<=120 (normal
+  // axis), eased up to 1 by 170 — short of the QRS Duration slider's 200ms
+  // max, so Right/Extreme are comfortably reachable well before the slider's
+  // end rather than needing near-pixel-perfect dragging to the max; 170-200
+  // just plateaus at full deviation. Both sides of the 120ms boundary
+  // evaluate to the same value there, so morphology sweeps smoothly through
+  // the threshold instead of jumping.
+  const widenProgress = smoothstep((qrsDuration - 120) / (170 - 120))
+  const axisTarget     = AXIS_TARGETS[qrsAxisPattern] ?? AXIS_TARGETS.left
 
   // Base QRS/T params for conducted beats — T becomes discordant when wide QRS
   const baseQRS = {
     qAmplitude:  -0.10,
-    rAmplitude:   isWide ? 0.90 : 1.50,
-    sAmplitude:   isWide ? -0.40 : -0.25,
+    rAmplitude:   lerp(1.50, 0.90, widenProgress),
+    sAmplitude:   lerp(-0.25, -0.40, widenProgress),
     qrsDuration,
-    qrsAxis:      60,
+    qrsAxis:      axisOverrideDeg ?? lerp(60, axisTarget, widenProgress),   // wide QRS deviates toward the selected pattern, mirroring the LBBB/RBBB/ectopic presets — unless manually overridden
     qtInterval,
-    tDuration:    isWide ? 185 : 160,
+    tDuration:    lerp(160, 185, widenProgress),
     tAmplitude:   0.35,
-    tAxis:        isWide ? 135 : 45,
+    tAxis:        lerp(45, 135, widenProgress),
     stElevation:  0,
   }
 
@@ -896,9 +956,14 @@ export function buildRhythmFromParams(ui) {
       tDuration:   isJ ? 160 : 230,
       qrsLeadIn:   0,
     })
+    // Ventricular escape has no qrsDuration-driven ramp of its own (it's
+    // already a fixed wide morphology), so it deviates fully toward whichever
+    // pattern is selected — previously hard-coded to -75 (Left) always,
+    // making Right/Extreme unreachable via this path regardless of selection.
+    const escQrsAxis = axisOverrideDeg ?? (isJ ? 60 : axisTarget)
     const escTemplate = [
-      { name: 'R', amplitude: isJ ? 1.10 : 0.90,  center: escPos.rCenter, sigma: escPos.rSigma * (isJ ? 1.0 : 1.15), axisDeg: isJ ?  60 : -75 },
-      { name: 'S', amplitude: isJ ? -0.20 : -0.22, center: escPos.sCenter, sigma: escPos.sSigma,                       axisDeg: isJ ?  60 : -75 },
+      { name: 'R', amplitude: isJ ? 1.10 : 0.90,  center: escPos.rCenter, sigma: escPos.rSigma * (isJ ? 1.0 : 1.15), axisDeg: escQrsAxis },
+      { name: 'S', amplitude: isJ ? -0.20 : -0.22, center: escPos.sCenter, sigma: escPos.sSigma,                       axisDeg: escQrsAxis },
       { name: 'T', amplitude: isJ ?  0.28 : 0.65,  center: escPos.tCenter, sigma: escPos.tSigma,                       axisDeg: isJ ?  45 : 105 },
     ]
 
@@ -929,9 +994,9 @@ export function buildRhythmFromParams(ui) {
     for (let i = 0; i < qCt; i++) {
       const o = i * PP + prInterval
       waves.push(
-        { name: 'Q', amplitude: baseQRS.qAmplitude,  center: o + qrstPos.qCenter, sigma: qrstPos.qSigma, axisDeg: 60 },
-        { name: 'R', amplitude: baseQRS.rAmplitude,  center: o + qrstPos.rCenter, sigma: qrstPos.rSigma, axisDeg: 60 },
-        { name: 'S', amplitude: baseQRS.sAmplitude,  center: o + qrstPos.sCenter, sigma: qrstPos.sSigma, axisDeg: 60 },
+        { name: 'Q', amplitude: baseQRS.qAmplitude,  center: o + qrstPos.qCenter, sigma: qrstPos.qSigma, axisDeg: baseQRS.qrsAxis },
+        { name: 'R', amplitude: baseQRS.rAmplitude,  center: o + qrstPos.rCenter, sigma: qrstPos.rSigma, axisDeg: baseQRS.qrsAxis },
+        { name: 'S', amplitude: baseQRS.sAmplitude,  center: o + qrstPos.sCenter, sigma: qrstPos.sSigma, axisDeg: baseQRS.qrsAxis },
         { name: 'T', amplitude: baseQRS.tAmplitude,  center: o + qrstPos.tCenter, sigma: qrstPos.tSigma, axisDeg: baseQRS.tAxis },
       )
     }

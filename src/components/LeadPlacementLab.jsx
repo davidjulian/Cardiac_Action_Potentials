@@ -1,5 +1,6 @@
 ﻿import { useEffect, useRef, useState } from 'react'
-import { ECGVoltage, buildRhythmFromParams } from '../lib/ECGEngine'
+import { ECGVoltage, buildRhythmFromParams, meanQRSAxis } from '../lib/ECGEngine'
+import { AxisSummaryPanel } from './MeanAxisPanel'
 
 function PlayIcon()  { return <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> }
 function PauseIcon() { return <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg> }
@@ -168,6 +169,10 @@ export default function LeadPlacementLab() {
   })
   const dragging   = useRef(null)   // 'plus' | 'minus' | null
 
+  // RHYTHM is a fixed module constant, so the mean axis is fixed too —
+  // compute once per render (cheap) rather than per animation frame.
+  const axis = meanQRSAxis(RHYTHM.waves)
+
   const [showEinthoven, setShowEinthoven] = useState(true)
   const [playing, setPlaying] = useState(true)
   const [speed, setSpeed] = useState(TIME_SCALE)
@@ -269,6 +274,18 @@ export default function LeadPlacementLab() {
           bCtx.textAlign = 'center'
           bCtx.fillText(id, pos.x, pos.y - 9)
         })
+
+        // ── Mean QRS axis arrow — bold, bright, distinct from the indigo
+        // instantaneous vector below. Same (Lead I, aVF) axis convention as
+        // Vx/Vy, just built from the net QRS deflection instead of one instant.
+        const { angleDeg: meanAngle, leadINet, leadAVFNet } = meanQRSAxis(waves)
+        const meanTipX = CX + leadINet  * DIPOLE_SCALE
+        const meanTipY = CY + leadAVFNet * DIPOLE_SCALE
+        drawArrow(bCtx, CX, CY, meanTipX, meanTipY, '#facc15', 4, true)
+        bCtx.fillStyle = '#facc15'
+        bCtx.font = 'bold 10px monospace'
+        bCtx.textAlign = 'center'
+        bCtx.fillText(`Mean QRS Axis ${meanAngle >= 0 ? '+' : ''}${meanAngle.toFixed(0)}°`, meanTipX, meanTipY - 10)
       }
 
       // Lead axis — extend across full canvas
@@ -600,6 +617,12 @@ export default function LeadPlacementLab() {
             <p><span className="text-gray-400">Perpendicular</span> → flat line</p>
             <p><span className="text-amber-400">Anti-parallel</span> → inverted</p>
           </div>
+
+          {showEinthoven && (
+            <div className="border-t border-gray-800 pt-3">
+              <AxisSummaryPanel angleDeg={axis.angleDeg} leadIMm={axis.leadIMm} leadAVFMm={axis.leadAVFMm} />
+            </div>
+          )}
         </div>
       </div>
 
