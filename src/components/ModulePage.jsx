@@ -8,12 +8,17 @@ import { useMode, MODULE_ORDER } from '../context/ModeContext'
  *   moduleId    — 'physics' | 'cardiac' | 'ECG' | 'scenarios'
  *   number      — 1-4
  *   title       — display title
- *   objective   — the single "aha moment" statement for this module
+ *   objective   — the single "aha moment" statement for this module.
+ *                 Optional — omit to skip the objective box entirely
+ *                 (e.g. for a module whose layout is tight on space).
  *   description — a paragraph describing what the module covers
+ *   wide        — when true, use a considerably wider container and
+ *                 tighter outer padding, for modules that need real
+ *                 horizontal room for a multi-column dashboard layout
  *   children    — the interactive content (p5.js canvas, ECG strip, etc.)
  *                 When null, shows a "coming soon" placeholder
  */
-export default function ModulePage({ moduleId, number, title, objective, description, children }) {
+export default function ModulePage({ moduleId, number, title, objective, description, wide = false, children }) {
   const { mode, progress, markComplete } = useMode()
   const navigate = useNavigate()
 
@@ -30,7 +35,7 @@ export default function ModulePage({ moduleId, number, title, objective, descrip
   }
 
   return (
-    <div className="min-h-screen p-8 max-w-4xl mx-auto">
+    <div className={`min-h-screen mx-auto ${wide ? 'p-5 max-w-[1500px]' : 'p-8 max-w-4xl'}`}>
 
       {/* ── Module header ── */}
       <div className="mb-8">
@@ -54,21 +59,23 @@ export default function ModulePage({ moduleId, number, title, objective, descrip
           )}
         </div>
 
-        <h1 className="text-2xl font-bold text-white mb-5">{title}</h1>
+        <h1 className={`text-2xl font-bold text-white ${objective ? 'mb-5' : 'mb-3'}`}>{title}</h1>
 
-        {/* Learning objective box — the "aha moment" */}
-        <div
-          className="rounded-xl p-4 border"
-          style={{ backgroundColor: accent + '0c', borderColor: accent + '30' }}
-        >
-          <p
-            className="text-xs uppercase tracking-widest font-semibold mb-2"
-            style={{ color: accent + 'aa' }}
+        {/* Learning objective box — the "aha moment" — optional */}
+        {objective && (
+          <div
+            className="rounded-xl p-4 border"
+            style={{ backgroundColor: accent + '0c', borderColor: accent + '30' }}
           >
-            Learning objective
-          </p>
-          <p className="text-sm text-gray-200 leading-relaxed">{objective}</p>
-        </div>
+            <p
+              className="text-xs uppercase tracking-widest font-semibold mb-2"
+              style={{ color: accent + 'aa' }}
+            >
+              Learning objective
+            </p>
+            <p className="text-sm text-gray-200 leading-relaxed">{objective}</p>
+          </div>
+        )}
       </div>
 
       {/* ── Module description ── */}
