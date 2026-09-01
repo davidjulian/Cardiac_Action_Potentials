@@ -8,8 +8,18 @@ function PauseIcon() { return <svg className="w-3.5 h-3.5" fill="currentColor" v
 const SPEEDS = [0.1, 0.25, 0.4, 0.7, 1]
 
 // ── Canvas sizes ──────────────────────────────────────────────────────────────
-const BW = 500, BH = 330    // body canvas
-const EW = 500, EH = 150    // ECG strip canvas
+// RENDER_SCALE shrinks the actual rendered canvases (to fit more on screen)
+// without touching any of the hand-tuned body-diagram coordinates below
+// (torso path, electrode positions, arrow math, etc.) — those are all still
+// authored in the original *_L "logical" space. Each frame draws through a
+// canvas transform that maps logical space onto the smaller physical
+// canvas, and mouse hit-testing divides back out by the same factor before
+// comparing against electrode positions (which stay in logical space).
+const RENDER_SCALE = 0.78
+const BW_L = 500, BH_L = 330    // body canvas — logical drawing space
+const EW_L = 500, EH_L = 150    // ECG strip canvas — logical drawing space
+const BW = Math.round(BW_L * RENDER_SCALE), BH = Math.round(BH_L * RENDER_SCALE)   // actual body canvas pixels
+const EW = Math.round(EW_L * RENDER_SCALE), EH = Math.round(EH_L * RENDER_SCALE)   // actual ECG canvas pixels
 
 // Cardiac dipole origin (center of chest in body canvas coords)
 const CX = 250, CY = 158
@@ -241,7 +251,9 @@ export default function LeadPlacementLab() {
       const thetaDeg = Math.acos(cosTheta) * 180 / Math.PI
 
       // ── Body canvas ────────────────────────────────────────────────────
+      bCtx.setTransform(1, 0, 0, 1, 0, 0)
       bCtx.clearRect(0, 0, BW, BH)
+      bCtx.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, 0)
       drawTorso(bCtx)
 
       // Einthoven triangle
@@ -406,15 +418,17 @@ export default function LeadPlacementLab() {
       }
 
       // ── ECG strip ──────────────────────────────────────────────────────
+      eCtx.setTransform(1, 0, 0, 1, 0, 0)
       eCtx.clearRect(0, 0, EW, EH)
       eCtx.fillStyle = '#030712'
       eCtx.fillRect(0, 0, EW, EH)
-      drawGrid(eCtx, EW, EH)
+      eCtx.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, 0)
+      drawGrid(eCtx, EW_L, EH_L)
 
-      const by = EH * BL
+      const by = EH_L * BL
       eCtx.beginPath()
-      for (let x = 0; x <= EW; x++) {
-        const v = ECGVoltage(elapsed - (EW - x) / PX_MS, cycleMs, waves, leadAxisDeg, nativeCycleMs)
+      for (let x = 0; x <= EW_L; x++) {
+        const v = ECGVoltage(elapsed - (EW_L - x) / PX_MS, cycleMs, waves, leadAxisDeg, nativeCycleMs)
         const y = by - v * PX_MV
         if (x === 0) eCtx.moveTo(x, y); else eCtx.lineTo(x, y)
       }
@@ -433,12 +447,15 @@ export default function LeadPlacementLab() {
   // ── Drag handling ─────────────────────────────────────────────────────────
   const HIT_R = 18
 
+  // Mouse position arrives in real device pixels (0..BW); divide by
+  // RENDER_SCALE to land back in the logical space electrode positions are
+  // actually stored/drawn in (0..BW_L) — see the RENDER_SCALE comment above.
   const onMouseDown = (e) => {
     const rect = bodyRef.current.getBoundingClientRect()
     const scaleX = BW / rect.width
     const scaleY = BH / rect.height
-    const mx = (e.clientX - rect.left) * scaleX
-    const my = (e.clientY - rect.top)  * scaleY
+    const mx = (e.clientX - rect.left) * scaleX / RENDER_SCALE
+    const my = (e.clientY - rect.top)  * scaleY / RENDER_SCALE
     const { plus, minus } = elec.current
     const dPlus  = Math.hypot(mx - plus.x,  my - plus.y)
     const dMinus = Math.hypot(mx - minus.x, my - minus.y)
@@ -451,11 +468,11 @@ export default function LeadPlacementLab() {
     const rect = bodyRef.current.getBoundingClientRect()
     const scaleX = BW / rect.width
     const scaleY = BH / rect.height
-    const mx = (e.clientX - rect.left) * scaleX
-    const my = (e.clientY - rect.top)  * scaleY
+    const mx = (e.clientX - rect.left) * scaleX / RENDER_SCALE
+    const my = (e.clientY - rect.top)  * scaleY / RENDER_SCALE
     elec.current[dragging.current] = {
-      x: Math.max(10, Math.min(BW - 10, mx)),
-      y: Math.max(10, Math.min(BH - 10, my)),
+      x: Math.max(10, Math.min(BW_L - 10, mx)),
+      y: Math.max(10, Math.min(BH_L - 10, my)),
     }
   }
 
@@ -474,7 +491,7 @@ export default function LeadPlacementLab() {
     <div className="rounded-2xl bg-gray-950 border border-gray-800 overflow-hidden">
 
       {/* Header */}
-      <div className="px-5 pt-5 pb-3 border-b border-gray-800">
+      <div className="px-3 pt-2.5 pb-1.5 border-b border-gray-800">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-sm font-semibold text-white mb-1">Lead Placement Lab</h3>
@@ -500,7 +517,7 @@ export default function LeadPlacementLab() {
       </div>
 
       {/* Playback controls */}
-      <div className="px-5 py-2.5 border-b border-gray-800 flex items-center gap-4 flex-wrap">
+      <div className="px-3 py-1.5 border-b border-gray-800 flex items-center gap-4 flex-wrap">
         <button
           onClick={() => setPlaying(v => !v)}
           className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
@@ -532,7 +549,7 @@ export default function LeadPlacementLab() {
       </div>
 
       {/* Scrub through the cardiac cycle */}
-      <div className="px-5 py-2.5 border-b border-gray-800 flex items-center gap-3">
+      <div className="px-3 py-1.5 border-b border-gray-800 flex items-center gap-3">
         <span className="text-xs uppercase tracking-widest text-gray-600 shrink-0">Scrub</span>
         <input
           ref={scrubRef}
@@ -578,7 +595,7 @@ export default function LeadPlacementLab() {
         </div>
 
         {/* Info panel */}
-        <div className="w-48 shrink-0 bg-gray-900/80 border-l border-gray-800 p-4 flex flex-col gap-5 justify-center">
+        <div className="w-48 shrink-0 bg-gray-900/80 border-l border-gray-800 p-3 flex flex-col gap-3 justify-center">
           <div>
             <p className="text-xs uppercase tracking-widest text-gray-600 mb-2">Physics</p>
             <p className="text-xs text-gray-400 leading-relaxed">

@@ -4,6 +4,10 @@ import { useAuth } from './AuthContext'
 
 const ModeContext = createContext(null)
 
+// The two mode accent colors — single source of truth, used by ModulePage
+// and ModuleTabs so an active tab and the module header agree on the color.
+export const MODE_ACCENT = { lab: '#818cf8', free: '#2dd4bf' }
+
 // The four modules in the order they appear in Lab Mode
 export const MODULE_ORDER = ['physics', 'cardiac', 'ECG', 'scenarios']
 

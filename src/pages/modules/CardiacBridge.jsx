@@ -2,8 +2,9 @@
 import p5 from 'p5'
 import ModulePage from '../../components/ModulePage'
 import HeartAnimation, { buildConductionMap } from '../../components/HeartAnimation'
-import { ECGVoltage, buildRhythmFromParams, meanQRSAxis } from '../../lib/ECGEngine'
+import { ECGVoltage, cycleVoltage, buildRhythmFromParams, meanQRSAxis } from '../../lib/ECGEngine'
 import { AxisSummaryPanel } from '../../components/MeanAxisPanel'
+import { useTabState, usePublishTabs } from '../../components/ModuleTabs'
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const CYCLE_MS = 800
@@ -200,6 +201,90 @@ const PK_PHASES = [
   },
 ]
 
+// ── AP data for 2C (Intracellular vs ECG) ──────────────────────────────────
+// Atrial myocyte: fast INa upstroke like MYO_AP, but a much briefer plateau
+// and faster repolarization (real atrial APD ≈ 150-200 ms vs ventricular
+// ≈ 300 ms) — the key shape difference the spec asks students to notice.
+const ATRIAL_AP = [
+  [0.00,-80],[0.05,-80],[0.10,-80],[0.15,-80],[0.18,-80],
+  [0.182,-78],[0.187,-45],[0.192,10],[0.197,22],[0.202,20],
+  [0.207,14],[0.216,6],
+  [0.225,2],[0.26,-2],[0.30,-12],[0.34,-32],[0.38,-58],[0.42,-76],[0.45,-80],
+  [0.50,-80],[0.60,-80],[0.75,-80],[0.90,-80],[1.00,-80],
+]
+const ATRIAL_PHASES = [
+  { id: 'p4r', label: 'Phase 4 — Resting Potential', tRange: [0, 0.182],
+    channels: 'IK1', ions: 'Stable resting potential ≈ −80 mV — slightly less negative than ventricular myocardium.' },
+  { id: 'p0', label: 'Phase 0 — Fast Upstroke', tRange: [0.182, 0.207],
+    channels: 'INa (fast voltage-gated Na⁺)', ions: 'Fast Na⁺-driven upstroke, same mechanism as ventricle, smaller amplitude.' },
+  { id: 'p1', label: 'Phase 1 — Early Repolarization', tRange: [0.207, 0.225],
+    channels: 'Ito', ions: 'Brief transient outward K⁺ notch.' },
+  { id: 'p2', label: 'Phase 2 — Brief Plateau', tRange: [0.225, 0.34],
+    channels: 'ICa-L vs IKr + IKs', ions: 'Much shorter plateau than ventricular myocardium → shorter refractory period → atria can be driven at much faster rates (flutter, fibrillation).' },
+  { id: 'p3', label: 'Phase 3 — Rapid Repolarization', tRange: [0.34, 0.45],
+    channels: 'IKr + IKs', ions: 'Rapid return to resting potential.' },
+  { id: 'p4d', label: 'Phase 4 — Electrical Diastole', tRange: [0.45, 1.0],
+    channels: 'IK1', ions: 'Stable at rest until the next wavefront arrives.' },
+]
+
+// Where each region's own upstroke lands on the SHARED real-time axis this
+// beat uses (t=0 → P wave onset). QRS_ONSET_MS ties the ventricle/Purkinje
+// anchors to the same PR interval the module's fixed default rhythm uses,
+// so "R-wave peak lands in the ventricular plateau" is true by construction,
+// not by coincidence — see ECGVsAPSection's "Zoom to QRS" feature below.
+const QRS_ONSET_MS = DEFAULT_RHYTHM_PARAMS.prInterval
+
+// HeartAnimation's ventricular chamber-fill animation (rhythmId
+// "normalSinusVoltage") deliberately lags the true Q/R/S timing by this
+// much — it waits for the His-bundle sweep to visually finish first before
+// the chambers start filling (see buildConductionMap's normalSinusVoltage
+// case: ventDelay = hisBottomMs - qOnMs + 20, a constant 40ms for this
+// preset's fixed His-entry duration). That's a fine cosmetic choice for the
+// animation on its own — and 2D's Conduction Animation still uses it
+// unmodified — but here the AP graph and ECG trace are shifted to match it
+// instead, so what the animation visually shows and what these graphs show
+// agree on the same instant, rather than the graphs "leading" the animation.
+const VENTRICULAR_ANIM_DELAY_MS = 40
+
+const AP_REGIONS = [
+  { key: 'sa', label: 'SA Node', data: SA_AP, phases: SA_PHASES, anchorFraction: 0.68, targetMs: 0,
+    desc: 'Slow spontaneous pacemaker potential (If + ICa-L). Threshold ≈ −40 mV. No fast upstroke — this cell drives its own rate.' },
+  { key: 'atrium', label: 'Atrium', data: ATRIAL_AP, phases: ATRIAL_PHASES, anchorFraction: 0.182, targetMs: 10,
+    desc: 'Fast upstroke (INa), brief plateau, rapid repolarization.' },
+  { key: 'av', label: 'AV Node', data: SA_AP, phases: SA_PHASES, anchorFraction: 0.68, targetMs: Math.round(QRS_ONSET_MS * 0.72),
+    desc: 'Slow-response cell like the SA node — ICa-L upstroke, no fast INa — but fires mid-way through the PR segment, imposing the AV delay.' },
+  { key: 'ventricle', label: 'Ventricle', data: MYO_AP, phases: MYO_PHASES, anchorFraction: 0.182, targetMs: QRS_ONSET_MS + VENTRICULAR_ANIM_DELAY_MS,
+    desc: 'Fast upstroke (Phase 0), long plateau (Phase 2, ICa-L), Phases 0–4 labeled below.' },
+  { key: 'purkinje', label: 'Purkinje', data: PK_AP, phases: PK_PHASES, anchorFraction: 0.182, targetMs: QRS_ONSET_MS + VENTRICULAR_ANIM_DELAY_MS - 15,
+    desc: 'Fastest upstroke and longest plateau of any cardiac cell — fires just ahead of ventricular myocardium.' },
+]
+
+// Piecewise-linear lookup into an AP data array at a cyclic fraction (data
+// arrays already close the loop: value at fraction 1.00 matches fraction 0.00).
+function interpAP(data, fraction) {
+  const f = ((fraction % 1) + 1) % 1
+  for (let i = 0; i < data.length - 1; i++) {
+    const [t0, v0] = data[i]
+    const [t1, v1] = data[i + 1]
+    if (f >= t0 && f <= t1) {
+      const frac = t1 === t0 ? 0 : (f - t0) / (t1 - t0)
+      return v0 + (v1 - v0) * frac
+    }
+  }
+  return data[data.length - 1][1]
+}
+
+// Converts a region's fraction-domain phase table into real-ms shaded bands
+// for TraceCanvas, using the same anchor/target mapping apValueAt() uses.
+function phasesToMarkers(phases, anchorFraction, targetMs, cycleMs) {
+  const toMs = (f) => targetMs + (f - anchorFraction) * cycleMs
+  return phases.map(ph => {
+    const [f0, f1] = ph.tRange
+    const col = AP_PHASE_COLORS[ph.id] || [100, 100, 100, 25]
+    return { x0: toMs(f0), x1: toMs(f1), color: `rgba(${col[0]},${col[1]},${col[2]},${(col[3] / 255).toFixed(2)})` }
+  })
+}
+
 // ── Structure lookup tables (for 2C) ──────────────────────────────────────
 const STRUCT_NAMES = {
   sa: 'SA Node', ra: 'Right Atrium', la: 'Left Atrium',
@@ -248,19 +333,19 @@ function SimBar({ children }) {
 }
 function Section({ label, title, subtitle, children }) {
   return (
-    <div className="mb-10">
+    <div className="mb-2">
       <div className="flex items-baseline gap-3 mb-1">
         <span className="text-xs font-mono text-cyan-500 uppercase tracking-widest">{label}</span>
-        <h2 className="text-lg font-semibold text-white">{title}</h2>
+        <h2 className="text-base font-semibold text-white">{title}</h2>
       </div>
-      {subtitle && <p className="text-sm text-gray-400 mb-4">{subtitle}</p>}
+      {subtitle && <p className="text-xs text-gray-400 mb-1.5 leading-snug">{subtitle}</p>}
       {children}
     </div>
   )
 }
 function Callout({ children }) {
   return (
-    <div className="mt-3 px-4 py-3 rounded-lg bg-cyan-950/40 border border-cyan-800/30 text-xs text-cyan-300 leading-relaxed">
+    <div className="mt-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/40 border border-cyan-800/30 text-xs text-cyan-300 leading-snug">
       {children}
     </div>
   )
@@ -438,8 +523,16 @@ function AnatomyDiagram({ selected, onSelect }) {
 
 // ── 2B: Action Potentials by Cell Type ────────────────────────────────────
 const AP_VMIN = -100, AP_VMAX = 45
-const AP_PAD = { l: 44, r: 14, t: 28, b: 20 }
-const AP_H = 190
+
+// Stable array references for TraceCanvas's yDomain prop — ECGVsAPSection
+// re-renders every animation frame (its clock's tMs state ticks ~60/s), so
+// an inline array literal here would give TraceCanvas a new reference each
+// frame and force its draw-loop effect to tear down and restart constantly,
+// which is what caused the visible flashing.
+const AP_Y_DOMAIN = [AP_VMIN, AP_VMAX]
+const ECG_Y_DOMAIN = [0, 1.5]
+const AP_PAD = { l: 40, r: 12, t: 24, b: 18 }
+const AP_H = 150
 
 const AP_PHASE_COLORS = {
   p4:    [59,  130, 246, 40],
@@ -581,11 +674,11 @@ function APPanel({ panelKey, title, sub, data, phases, isSelected, onHover }) {
 
   return (
     <div
-      className={`border-b border-gray-800 last:border-b-0 ${isSelected ? 'ring-1 ring-cyan-500/50' : ''}`}
+      className={`flex-1 min-w-0 border-r border-gray-800 last:border-r-0 ${isSelected ? 'ring-1 ring-cyan-500/50' : ''}`}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >
-      <div className="flex items-baseline gap-2 px-4 pt-2 pb-1">
+      <div className="flex items-baseline gap-2 px-3 pt-1.5 pb-0.5">
         <span className="text-xs font-semibold text-gray-200">{title}</span>
         <span className="text-xs text-gray-500">{sub}</span>
       </div>
@@ -605,8 +698,8 @@ function ActionPotentials({ selectedKey }) {
 
   return (
     <div>
-      <div className="rounded-xl border border-gray-800 overflow-hidden mb-3">
-        <div className="flex items-center justify-between bg-gray-900 border-b border-gray-800 px-3 py-2 text-xs text-gray-400">
+      <div className="rounded-xl border border-gray-800 overflow-hidden mb-2">
+        <div className="flex items-center justify-between bg-gray-900 border-b border-gray-800 px-3 py-1.5 text-xs text-gray-400">
           <span>Hover within a panel to see ion channel detail for that phase</span>
           {selectedKey && (
             <span className="text-cyan-400">
@@ -614,27 +707,33 @@ function ActionPotentials({ selectedKey }) {
             </span>
           )}
         </div>
-        {panels.map(panel => (
-          <APPanel
-            key={panel.key}
-            panelKey={panel.key}
-            title={panel.title}
-            sub={panel.sub}
-            data={panel.data}
-            phases={panel.phases}
-            isSelected={selectedKey === panel.key}
-            onHover={setIonInfo}
-          />
-        ))}
+        {/* Side by side instead of stacked — three panels stacked vertically
+            cost ~3×AP_H of scroll; a row costs one AP_H total. Each panel's
+            canvas already sizes itself from its own container width via
+            clientWidth, so this needs no changes beyond the wrapper layout. */}
+        <div className="flex">
+          {panels.map(panel => (
+            <APPanel
+              key={panel.key}
+              panelKey={panel.key}
+              title={panel.title}
+              sub={panel.sub}
+              data={panel.data}
+              phases={panel.phases}
+              isSelected={selectedKey === panel.key}
+              onHover={setIonInfo}
+            />
+          ))}
+        </div>
       </div>
       {ionInfo ? (
-        <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-4 text-xs">
-          <div className="text-xs text-cyan-400 mb-2">{ionInfo.panelTitle} — {ionInfo.phase.label}</div>
+        <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-2.5 text-xs">
+          <div className="text-xs text-cyan-400 mb-1.5">{ionInfo.panelTitle} — {ionInfo.phase.label}</div>
           <InfoRow label="Key channels" value={ionInfo.phase.channels} />
           <InfoRow label="Ion movement" value={ionInfo.phase.ions} />
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-800 bg-gray-900/40 px-4 py-3 text-xs text-gray-600 text-center">
+        <div className="rounded-xl border border-gray-800 bg-gray-900/40 px-3 py-2 text-xs text-gray-600 text-center">
           Hover over a phase region to see ion channel detail
         </div>
       )}
@@ -642,10 +741,637 @@ function ActionPotentials({ selectedKey }) {
   )
 }
 
-// ── 2C: Conduction Animation ───────────────────────────────────────────────
-function ConductionSection({ clockRef, rhythm, conductionMap, masterTimeMs, isPlaying, onToggle, onScrub, onStep }) {
-  const tMs = masterTimeMs
+// ── 2C: What Does the ECG Actually Record? ─────────────────────────────────
+
+// HeartAnimation reads clockRef.current.{tInCycle,cycleMs,nativeCycleMs} —
+// nativeCycleMs/cycleMs are kept on the ref (not just closed over) so the
+// SAME clock instance driving the AP/ECG canvases below can also drive the
+// real conduction animation in sync.
+function useLocalClock(cycleMs, nativeCycleMs = null) {
+  const clockRef = useRef({ tInCycle: 0, cycleMs, nativeCycleMs })
+  const [tMs, setTMs] = useState(0)
+  const isPlayingRef = useRef(true)
+  const [isPlaying, setIsPlaying] = useState(true)
+
+  useEffect(() => {
+    clockRef.current.cycleMs = cycleMs
+    clockRef.current.nativeCycleMs = nativeCycleMs
+  }, [cycleMs, nativeCycleMs])
+
+  useEffect(() => {
+    let lastTs = null, raf
+    const tick = (ts) => {
+      if (isPlayingRef.current && lastTs !== null) {
+        const dt = Math.min(ts - lastTs, 50)
+        const newT = (clockRef.current.tInCycle + dt) % cycleMs
+        clockRef.current.tInCycle = newT
+        setTMs(Math.round(newT))
+      }
+      lastTs = ts
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [cycleMs])
+
+  const setPlaying = useCallback((v) => { isPlayingRef.current = v; setIsPlaying(v) }, [])
+  const toggle = useCallback(() => setPlaying(!isPlayingRef.current), [setPlaying])
+  const scrub = useCallback((ms) => { clockRef.current.tInCycle = ms; setTMs(ms) }, [])
+
+  return { clockRef, tMs, isPlaying, toggle, setPlaying, scrub }
+}
+
+// Generic time-series canvas: draws valueAt(t) over xDomain, with an optional
+// set of shaded phase bands and a cursor synced to clockRef's live position.
+function TraceCanvas({ clockRef, valueAt, xDomain, yDomain, color, phaseMarkers, height = 130 }) {
+  const canvasRef = useRef(null)
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const container = containerRef.current
+    if (!canvas || !container) return
+    const dpr = window.devicePixelRatio || 1
+    const PAD = { l: 44, r: 10, t: 10, b: 18 }
+    let W = 0
+
+    const resize = () => {
+      W = container.clientWidth || 300
+      canvas.width = W * dpr
+      canvas.height = height * dpr
+      canvas.style.width = '100%'
+      canvas.style.height = height + 'px'
+    }
+    resize()
+    const ctx = canvas.getContext('2d')
+
+    let rafId
+    const frame = () => {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      const dW = W - PAD.l - PAD.r
+      const dH = height - PAD.t - PAD.b
+      const [x0, x1] = xDomain
+      const [yMin, yMax] = yDomain
+      const toX = (t) => PAD.l + ((t - x0) / (x1 - x0)) * dW
+      const toY = (v) => PAD.t + ((yMax - v) / (yMax - yMin)) * dH
+
+      ctx.clearRect(0, 0, W, height)
+      ctx.fillStyle = '#111827'
+      ctx.fillRect(0, 0, W, height)
+
+      if (phaseMarkers) {
+        phaseMarkers.forEach(({ x0: px0, x1: px1, color: pc }) => {
+          if (px1 < x0 || px0 > x1) return
+          const rx = toX(Math.max(px0, x0)), rx2 = toX(Math.min(px1, x1))
+          ctx.fillStyle = pc
+          ctx.fillRect(rx, PAD.t, rx2 - rx, dH)
+        })
+      }
+
+      ctx.strokeStyle = '#374151'
+      ctx.lineWidth = 0.5
+      ctx.fillStyle = '#6b7280'
+      ctx.font = '9px monospace'
+      const ySteps = 4
+      for (let i = 0; i <= ySteps; i++) {
+        const v = yMin + (i / ySteps) * (yMax - yMin)
+        const y = toY(v)
+        ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(W - PAD.r, y); ctx.stroke()
+        ctx.fillText(v.toFixed(Number.isInteger(v) ? 0 : 1), 2, y + 3)
+      }
+
+      ctx.strokeStyle = color
+      ctx.lineWidth = 1.8
+      ctx.beginPath()
+      const N = 220
+      for (let i = 0; i <= N; i++) {
+        const t = x0 + (i / N) * (x1 - x0)
+        const v = Math.max(yMin, Math.min(yMax, valueAt(t)))
+        const x = toX(t), y = toY(v)
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+      }
+      ctx.stroke()
+
+      const tNow = clockRef.current.tInCycle
+      if (tNow >= x0 && tNow <= x1) {
+        const cx = toX(tNow)
+        ctx.strokeStyle = '#f8fafc'
+        ctx.lineWidth = 1
+        ctx.setLineDash([3, 3])
+        ctx.beginPath(); ctx.moveTo(cx, PAD.t); ctx.lineTo(cx, height - PAD.b); ctx.stroke()
+        ctx.setLineDash([])
+      }
+
+      rafId = requestAnimationFrame(frame)
+    }
+    rafId = requestAnimationFrame(frame)
+
+    const ro = new ResizeObserver(resize)
+    ro.observe(container)
+    return () => { cancelAnimationFrame(rafId); ro.disconnect() }
+  }, [valueAt, xDomain, yDomain, phaseMarkers, color, height, clockRef])
+
+  return (
+    <div ref={containerRef} className="w-full">
+      <canvas ref={canvasRef} />
+    </div>
+  )
+}
+
+function ElectrodeIcon() {
+  return (
+    <svg width="24" height="38" viewBox="0 0 26 42" style={{ display: 'block' }}>
+      <rect x="15" y="0" width="9" height="9" rx="1.5" fill="#374151" stroke="#6b7280" />
+      <line x1="20" y1="2" x2="4" y2="34" stroke="#facc15" strokeWidth="3" strokeLinecap="round" />
+      <circle cx="4" cy="34" r="2.5" fill="#facc15" />
+    </svg>
+  )
+}
+
+// Draggable micropipette dropped directly onto the SAME heart illustration
+// used by 2D's Conduction Animation (HeartAnimation), driven by the exact
+// clock powering the AP/ECG graphs below — so the conduction sweep animates
+// in sync with both traces rather than running on its own separate timer.
+//
+// Hit-testing and highlighting are deliberately decoupled for Purkinje.
+//
+// Highlighting still uses the REAL traced path: there's no shape drawn
+// specifically labeled "Purkinje" in this illustration, but the conduction-
+// bundle path (rbundle/lbundle — right/left halves of one shared shape
+// reaching from the AV node area down through the fanning terminal branches
+// at the apex) IS the His-Purkinje system, so it's tagged
+// data-region="purkinje" in HeartAnimation.jsx and gets the same
+// drop-shadow-on-real-geometry glow atrium/ventricle get.
+//
+// Hit-testing does NOT use that same real fill for Purkinje, though: once
+// unclipped, that path's silhouette fans out across a large part of BOTH
+// ventricle chambers (not just the septum), so testing against it kept
+// registering "Purkinje" over a wide swath of what should read as
+// "ventricle." Instead, Purkinje gets a small dedicated circular hit-zone
+// positioned at the actual gap between the two measured ventricle boxes,
+// biased toward their lower/apex side — and that circle is checked WITH
+// PRIORITY, before ventricle's own exact-shape test, so landing in that gap
+// always reads as Purkinje regardless of whether the ventricle's real shape
+// also happens to cover the same point. SA/AV get the same small-circle,
+// checked-with-priority treatment — both nodes sit physically inside the
+// atrium's own illustrated area, and their real shapes are only a few px
+// across anyway (too small to reliably drop onto), so a small dedicated
+// circle checked before atrium's exact-shape test is both more forgiving
+// and correctly wins there. Atrium (ra+la) and ventricle (rv+lv) themselves
+// are tested against their real fill via isPointInFill() (each element's own
+// getScreenCTM() inverse correctly maps the client point into that path's
+// local space, including the extra scale(0.26458333) transform some of
+// these paths carry).
+// Scaled 1.6× along with the heart's own render size (200→320) so these
+// hit-zones keep the same feel relative to the artwork instead of shrinking
+// in proportion to it.
+const NODE_RADIUS = 16        // sa / av circular targets — small and given priority
+                               // over atrium below since both sit inside its area
+const PURKINJE_RADIUS = 24    // smaller — its zone sits right at the ventricle
+                               // boxes' edge, so a big circle bled into them
+const REGION_PAD = 6          // outline padding beyond each measured atrium bbox
+const VENTRICLE_SHRINK = 16   // ventricle's fallback box is inset by this much so it
+                               // doesn't claim the septal gap / apex where Purkinje is
+const HIT_TOLERANCE = 29      // how far outside any shape's edge still counts as a hit
+
+function HeartDropTarget({ clockRef, rhythm, selectedRegion, onSelect }) {
+  // The electrode is absolutely positioned relative to `stageRef` (the inner
+  // W×H box), NOT the outer padded/centered container — so drag math must
+  // use stageRef's own bounding rect too, or the electrode ends up offset
+  // by however much the outer container is wider/centered than the stage.
+  const stageRef = useRef(null)
+  const [dragPos, setDragPos] = useState(null)
+  const [dragging, setDragging] = useState(false)
+  const [hoverRegion, setHoverRegion] = useState(null)
+  const [regionShapes, setRegionShapes] = useState(null)
+  // Real DOM elements for atrium (ra+la) / ventricle (rv+lv) / purkinje
+  // (rbundle+lbundle) — used both to hit-test against their TRUE traced
+  // outline (not a bounding box) and to highlight that exact outline, so
+  // "the boundary" is the real illustrated shape, not an approximation.
+  const shapeElsRef = useRef({ atrium: [], ventricle: [], purkinje: [] })
+
+  // Sized larger than the original 200×236 now that this component has a
+  // full-width row to itself (see ECGVsAPSection) instead of sharing space
+  // with the AP panel — same 200:236 aspect ratio, just scaled up 1.6×.
+  const W = 320, H = 378
+  const highlighted = hoverRegion || selectedRegion
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      const stage = stageRef.current
+      if (!stage) return
+      shapeElsRef.current = {
+        atrium: Array.from(stage.querySelectorAll('[data-region="atrium"]')),
+        ventricle: Array.from(stage.querySelectorAll('[data-region="ventricle"]')),
+        purkinje: Array.from(stage.querySelectorAll('[data-region="purkinje"]')),
+      }
+
+      const stageRect = stage.getBoundingClientRect()
+      const groups = { sa: [], av: [], atrium: [], ventricle: [], purkinje: [] }
+      stage.querySelectorAll('[data-region]').forEach(el => {
+        const list = groups[el.dataset.region]
+        if (!list) return
+        const r = el.getBoundingClientRect()
+        list.push({
+          left: r.left - stageRect.left, right: r.right - stageRect.left,
+          top: r.top - stageRect.top, bottom: r.bottom - stageRect.top,
+        })
+      })
+
+      // sa/av: a single small element each — union their (one) box into a circle.
+      const circleFrom = (boxes) => {
+        if (!boxes.length) return null
+        const left = Math.min(...boxes.map(b => b.left)), right = Math.max(...boxes.map(b => b.right))
+        const top = Math.min(...boxes.map(b => b.top)), bottom = Math.max(...boxes.map(b => b.bottom))
+        return { kind: 'circle', x: (left + right) / 2, y: (top + bottom) / 2, r: NODE_RADIUS }
+      }
+      // atrium/ventricle/purkinje boxes are kept ONLY as a forgiving near-miss
+      // fallback for regionAt() below — not rendered — since the real shapes
+      // (traced exactly via isPointInFill + a drop-shadow outline) do that job.
+      const rectsFrom = (boxes, pad) => boxes.map(b => ({
+        kind: 'rect',
+        left: b.left - pad, right: b.right + pad,
+        top: b.top - pad, bottom: b.bottom + pad,
+      }))
+
+      const sa = groups.sa.length ? [circleFrom(groups.sa)] : []
+      const av = groups.av.length ? [circleFrom(groups.av)] : []
+      const atrium = rectsFrom(groups.atrium, REGION_PAD)
+      // Ventricle shrinks inward (rather than padding out) so its fallback
+      // box doesn't reach into the septal gap between the two chambers or
+      // down toward the apex — both of which should read as Purkinje.
+      const ventricle = rectsFrom(groups.ventricle, -VENTRICLE_SHRINK)
+      // Purkinje's real traced shape (rbundle/lbundle unclipped) turned out
+      // to fan out across a large chunk of BOTH ventricles, not just the
+      // septum — using its exact fill for hit-testing kept overlapping
+      // ventricle over a wide area. So instead of testing that fill, its
+      // hitbox is a small dedicated circle placed at the actual gap between
+      // the two measured ventricle boxes, biased toward their lower/apex
+      // side. The glow highlight still uses the real shape (unchanged) —
+      // only what counts as "inside Purkinje" changed.
+      let purkinje = []
+      if (groups.ventricle.length) {
+        const xs = groups.ventricle.map(b => (b.left + b.right) / 2)
+        const x = xs.reduce((a, b) => a + b, 0) / xs.length
+        const top = Math.min(...groups.ventricle.map(b => b.top))
+        const bottom = Math.max(...groups.ventricle.map(b => b.bottom))
+        const y = top + (bottom - top) * 0.72
+        purkinje = [{ kind: 'circle', x, y, r: PURKINJE_RADIUS }]
+      }
+
+      setRegionShapes({ sa, av, atrium, ventricle, purkinje })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [])
+
+  // Distance from (x,y) to a shape's edge — 0 when the point is inside/on it.
+  const distToShape = (x, y, shape) => {
+    if (shape.kind === 'circle') return Math.max(0, Math.hypot(x - shape.x, y - shape.y) - shape.r)
+    const dx = Math.max(shape.left - x, 0, x - shape.right)
+    const dy = Math.max(shape.top - y, 0, y - shape.bottom)
+    return Math.hypot(dx, dy)
+  }
+
+  // Exact test against the real artwork's own filled silhouette — each
+  // element's getScreenCTM() already folds in its own transform (some of
+  // these paths carry an extra scale(0.26458333)) plus every ancestor's, so
+  // converting the client point through its inverse lands correctly in that
+  // element's local path-data space regardless of how it's nested.
+  const pathHit = (clientX, clientY, els) => {
+    for (const el of els) {
+      if (typeof el.isPointInFill !== 'function' || typeof el.getScreenCTM !== 'function') continue
+      const ctm = el.getScreenCTM()
+      const svg = el.ownerSVGElement
+      if (!ctm || !svg) continue
+      const pt = svg.createSVGPoint()
+      pt.x = clientX
+      pt.y = clientY
+      const local = pt.matrixTransform(ctm.inverse())
+      if (el.isPointInFill(local)) return true
+    }
+    return false
+  }
+
+  const regionAt = useCallback((clientX, clientY) => {
+    if (!regionShapes || !stageRef.current) return null
+    const rect0 = stageRef.current.getBoundingClientRect()
+    const lx = clientX - rect0.left, ly = clientY - rect0.top
+
+    // SA/AV and Purkinje's dedicated hit-zones (small circles) are checked
+    // FIRST, unconditionally, all ahead of atrium/ventricle's real-shape
+    // tests. SA and AV physically sit inside the atrium's own illustrated
+    // area, so without this an atrium drop would always win there before
+    // the tiny node circles ever got a chance (same reasoning as Purkinje
+    // vs. ventricle below). Being inside one of these small zones always
+    // wins, regardless of whether atrium/ventricle's real shape also covers it.
+    const saCircle = (regionShapes.sa || [])[0]
+    if (saCircle && distToShape(lx, ly, saCircle) === 0) return 'sa'
+    const avCircle = (regionShapes.av || [])[0]
+    if (avCircle && distToShape(lx, ly, avCircle) === 0) return 'av'
+    const purkCircle = (regionShapes.purkinje || [])[0]
+    if (purkCircle && distToShape(lx, ly, purkCircle) === 0) return 'purkinje'
+
+    // True-boundary hit against the real artwork takes priority over the
+    // approximating shapes below (falls back gracefully if isPointInFill
+    // isn't supported in this browser — shapeElsRef stays empty-checked).
+    if (pathHit(clientX, clientY, shapeElsRef.current.atrium)) return 'atrium'
+    if (pathHit(clientX, clientY, shapeElsRef.current.ventricle)) return 'ventricle'
+
+    let best = null, bestDist = Infinity
+    for (const key of ['sa', 'av', 'atrium', 'ventricle', 'purkinje']) {
+      for (const shape of regionShapes[key] || []) {
+        const d = distToShape(lx, ly, shape)
+        if (d < bestDist) { bestDist = d; best = key }
+      }
+    }
+    return bestDist <= HIT_TOLERANCE ? best : null
+  }, [regionShapes])
+
+  // Imperatively glow the REAL path(s) matching whichever region is
+  // currently hovered/selected — a CSS drop-shadow filter follows the
+  // element's actual alpha silhouette, so the highlight traces the true
+  // organic boundary instead of any rectangle/circle approximation.
+  useEffect(() => {
+    const { atrium, ventricle, purkinje } = shapeElsRef.current
+    const glow = 'drop-shadow(0 0 3px #22d3ee) drop-shadow(0 0 3px #22d3ee)'
+    atrium.forEach(el => { el.style.filter = highlighted === 'atrium' ? glow : '' })
+    ventricle.forEach(el => { el.style.filter = highlighted === 'ventricle' ? glow : '' })
+    purkinje.forEach(el => { el.style.filter = highlighted === 'purkinje' ? glow : '' })
+  })
+
+  const handlePointerDown = (e) => {
+    e.preventDefault()
+    const rect = stageRef.current.getBoundingClientRect()
+    setDragging(true)
+    setDragPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+  }
+
+  useEffect(() => {
+    if (!dragging) return
+    const move = (e) => {
+      const rect = stageRef.current.getBoundingClientRect()
+      setDragPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+      const hit = regionAt(e.clientX, e.clientY)
+      setHoverRegion(hit)
+      // Live-update the AP trace while dragging, not just on drop — onSelect
+      // sets selectedRegion, which the AP panel reads directly.
+      onSelect(hit)
+    }
+    const up = (e) => {
+      setDragging(false)
+      // Leave dragPos as-is — the electrode stays wherever it was dropped
+      // instead of snapping back to its home corner.
+      // Always call onSelect, even with null — dropping off every region
+      // should clear the reading, not leave the previous one showing.
+      onSelect(regionAt(e.clientX, e.clientY))
+      setHoverRegion(null)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+  }, [dragging, onSelect, regionAt])
+
+  return (
+    <div className="relative rounded-xl border border-gray-800 bg-gray-900/60 p-3 flex flex-col items-center">
+      <div ref={stageRef} className="relative" style={{ width: W, height: H }}>
+        <HeartAnimation clockRef={clockRef} rhythmId="normalSinusVoltage" rhythm={rhythm} width={W} height={H} />
+
+        {/* SA/AV: a small circular hit-zone, drawn since there's no other
+            visible affordance for these tiny shapes. Atrium/Ventricle/
+            Purkinje get NO drawn overlay here — their highlight is the
+            drop-shadow glow applied directly to the real paths above (see
+            the effect that sets el.style.filter), so what lights up is the
+            actual traced boundary, not an approximating shape. */}
+        {regionShapes && ['sa', 'av'].flatMap((key) => {
+          const active = highlighted === key
+          return (regionShapes[key] || []).map((shape, i) => (
+            <div
+              key={`${key}-${i}`}
+              className="absolute rounded-full pointer-events-none transition-colors"
+              style={{
+                left: shape.x - shape.r,
+                top: shape.y - shape.r,
+                width: shape.r * 2,
+                height: shape.r * 2,
+                background: active ? 'rgba(6,182,212,0.18)' : 'transparent',
+                border: active ? '1.5px solid #22d3ee' : '1px dashed rgba(148,163,184,0.3)',
+              }}
+            />
+          ))
+        })}
+
+        <div
+          onPointerDown={handlePointerDown}
+          className="absolute cursor-grab active:cursor-grabbing select-none"
+          style={{
+            left: dragPos ? dragPos.x - 12 : 2,
+            top: dragPos ? dragPos.y - 12 : 2,
+            touchAction: 'none',
+            zIndex: 20,
+            pointerEvents: dragging ? 'none' : 'auto',
+          }}
+          title="Drag onto a region of the heart"
+        >
+          <ElectrodeIcon />
+        </div>
+      </div>
+      <p className="text-[11px] text-gray-500 mt-2">
+        {selectedRegion ? <>Recording from: <span className="text-cyan-300">{AP_REGIONS.find(r => r.key === selectedRegion)?.label}</span></> : 'Drag the electrode onto the heart'}
+      </p>
+    </div>
+  )
+}
+
+function ECGVsAPSection({ rhythm }) {
   const cycleMs = rhythm.cycleMs || CYCLE_MS
+  const { clockRef, tMs, isPlaying, toggle, setPlaying, scrub } = useLocalClock(cycleMs, rhythm.nativeCycleMs ?? null)
+  const [selectedRegion, setSelectedRegion] = useState('ventricle')
+  const [zoomed, setZoomed] = useState(false)
+
+  const region = useMemo(() => AP_REGIONS.find(r => r.key === selectedRegion) || null, [selectedRegion])
+
+  const apValueAt = useCallback((t) => {
+    if (!region) return -80
+    const f = region.anchorFraction + ((t - region.targetMs + cycleMs) % cycleMs) / cycleMs
+    return interpAP(region.data, f)
+  }, [region, cycleMs])
+
+  // Deliberately uses cycleVoltage (a raw, unwarped sum of the wave
+  // Gaussians at time t) instead of ECGVoltage — ECGVoltage runs its input
+  // through warpTime() first, shifting the visible R-wave peak by up to
+  // ~40ms in a way that drifts continuously against the clock, which would
+  // be a second, independent source of desync against the animation on top
+  // of the one below.
+  //
+  // The QRS complex (Q/R/S — the ventricular portion) is shifted later by
+  // VENTRICULAR_ANIM_DELAY_MS so it lines up with HeartAnimation's own
+  // delayed ventricular fill (see that constant's comment) — same idea as
+  // the ventricle AP anchor above. P and T stay at their true time: the
+  // animation's atrial flash and repolarization sweep aren't delayed the
+  // same way, so shifting them would just trade one desync for another.
+  const shiftedWaves = useMemo(() => (
+    (rhythm.waves || []).map(w => (
+      (w.name === 'Q' || w.name === 'R' || w.name === 'S')
+        ? { ...w, center: w.center + VENTRICULAR_ANIM_DELAY_MS }
+        : w
+    ))
+  ), [rhythm.waves])
+
+  const ecgValueAt = useCallback((t) => {
+    if (shiftedWaves.length === 0) return 0
+    return cycleVoltage(t, shiftedWaves, 60)
+  }, [shiftedWaves])
+
+  // Both use the SHIFTED position (matching shiftedWaves/the ventricle AP
+  // anchor above), so "Zoom to QRS" centers on where the R wave actually
+  // appears on this trace, not its pre-shift value.
+  const rWave = useMemo(() => shiftedWaves.find(w => w.name === 'R'), [shiftedWaves])
+  const rWaveCenter = rWave ? rWave.center : QRS_ONSET_MS + VENTRICULAR_ANIM_DELAY_MS + 38
+
+  const xDomain = useMemo(
+    () => (zoomed
+      ? [Math.max(0, QRS_ONSET_MS + VENTRICULAR_ANIM_DELAY_MS - 60), QRS_ONSET_MS + VENTRICULAR_ANIM_DELAY_MS + 160]
+      : [0, cycleMs]),
+    [zoomed, cycleMs]
+  )
+  const apMarkers = useMemo(
+    () => (region ? phasesToMarkers(region.phases, region.anchorFraction, region.targetMs, cycleMs) : []),
+    [region, cycleMs]
+  )
+
+  const handleZoom = useCallback(() => {
+    if (zoomed) { setZoomed(false); return }
+    setSelectedRegion('ventricle')
+    setPlaying(false)
+    scrub(rWaveCenter)
+    setZoomed(true)
+  }, [zoomed, setPlaying, scrub, rWaveCenter])
+
+  return (
+    <div>
+      {/* TOP — the heart itself: drag the electrode here */}
+      <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 flex flex-col items-center">
+        <p className="text-xs text-gray-500 mb-3 text-center max-w-md">
+          Drag the electrode onto the heart below to record from that region — the two traces underneath update to show what that electrode (left) and the body surface (right) each see, simultaneously.
+        </p>
+        <HeartDropTarget
+          clockRef={clockRef}
+          rhythm={rhythm}
+          selectedRegion={selectedRegion}
+          onSelect={(key) => { setSelectedRegion(key); setZoomed(false) }}
+        />
+      </div>
+
+      {/* BELOW — the two traces, side by side */}
+      <div className="flex flex-col lg:flex-row gap-3 items-stretch mt-3">
+        {/* LEFT — Intracellular (AP) trace */}
+        <div className="flex-1 min-w-0 rounded-xl border border-gray-800 bg-gray-900/60 p-4">
+          <h3 className="text-sm font-semibold text-white mb-1">Intracellular Recording</h3>
+          <p className="text-xs text-gray-500 mb-3">Voltage across ONE cell's membrane — requires a microelectrode inside the cell.</p>
+          <div className="flex items-baseline justify-between mb-1">
+            <span className="text-xs font-semibold text-emerald-300">
+              {region ? `${region.label} action potential` : 'No electrode placed'}
+            </span>
+            <span className="text-[10px] text-gray-500">Membrane Potential (mV)</span>
+          </div>
+          <TraceCanvas
+            clockRef={clockRef}
+            valueAt={apValueAt}
+            xDomain={xDomain}
+            yDomain={AP_Y_DOMAIN}
+            color="#34d399"
+            phaseMarkers={apMarkers}
+          />
+          {region && <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">{region.desc}</p>}
+        </div>
+
+        {/* SEPARATOR */}
+        <div className="flex lg:flex-col items-center justify-center gap-2 lg:w-10 shrink-0 py-1">
+          <span className="text-2xl text-gray-600 font-bold">≠</span>
+          <span className="text-[10px] text-gray-600 text-center leading-tight max-w-[90px]">
+            These are not the same signal
+          </span>
+        </div>
+
+        {/* RIGHT — ECG trace */}
+        <div className="flex-1 min-w-0 rounded-xl border border-gray-800 bg-gray-900/60 p-4">
+          <h3 className="text-sm font-semibold text-white mb-1">ECG Recording (Body Surface)</h3>
+          <p className="text-xs text-gray-500 mb-3">Net dipole moment of the entire heart, viewed from outside the body.</p>
+          <div className="flex items-baseline justify-between mb-1">
+            <span className="text-xs font-semibold text-blue-300">Lead II — surface trace</span>
+            <span className="text-[10px] text-gray-500">Body Surface Voltage Difference (mV)</span>
+          </div>
+          <TraceCanvas
+            clockRef={clockRef}
+            valueAt={ecgValueAt}
+            xDomain={xDomain}
+            yDomain={ECG_Y_DOMAIN}
+            color="#60a5fa"
+          />
+          <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+            Left: voltage across one cell membrane (intracellular electrode required). Right: net dipole moment of the entire heart, summed across billions of cells, viewed from outside the body.
+          </p>
+        </div>
+      </div>
+
+      {/* Controls — shared clock drives both traces */}
+      <div className="flex items-center gap-3 flex-wrap mt-3">
+        <button
+          onClick={toggle}
+          className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-white transition-colors"
+        >
+          {isPlaying ? 'Pause' : 'Play'}
+        </button>
+        <input
+          type="range"
+          min={xDomain[0]}
+          max={xDomain[1]}
+          value={Math.min(Math.max(tMs, xDomain[0]), xDomain[1])}
+          onChange={e => scrub(Number(e.target.value))}
+          className="flex-1 min-w-[120px] accent-emerald-500"
+        />
+        <span className="text-xs font-mono text-gray-500 tabular-nums w-24">{Math.round(tMs)} / {cycleMs} ms</span>
+        <button
+          onClick={handleZoom}
+          className={`px-4 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+            zoomed
+              ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/50'
+              : 'bg-gray-800 text-gray-500 border-gray-700 hover:text-gray-300'
+          }`}
+        >
+          {zoomed ? 'Exit Zoom' : 'Zoom to QRS'}
+        </button>
+      </div>
+
+      {zoomed && (
+        <div className="mt-2 rounded-lg bg-emerald-950/40 border border-emerald-700/40 px-3 py-2 text-xs text-emerald-300 leading-relaxed">
+          At the peak of the R wave (t ≈ {Math.round(rWaveCenter)} ms), the ventricular myocyte is in <strong>Phase 2 — the plateau</strong>, not at the peak of its own upstroke. The AP upstroke happens well before the R wave peaks.
+        </div>
+      )}
+
+      {/* Misconception callout */}
+      <div className="mt-4 rounded-lg bg-amber-950/30 border border-amber-700/40 px-4 py-3 text-xs text-amber-200 leading-relaxed">
+        <strong>⚠ Common Misconception:</strong> The ECG does not show membrane potential. The upstroke of the R wave
+        does not correspond to the upstroke of the action potential. The ECG captures the spatial derivative of the
+        extracellular potential — the dipole field — summed across billions of cells. No single cell's membrane
+        potential can be read from an ECG. An intracellular microelectrode is required for that measurement.
+      </div>
+    </div>
+  )
+}
+
+// ── 2D: Conduction Animation ────────────────────────────────────────────────
+// Owns its own clock now that 2D is a standalone tab, never mounted
+// alongside 2E — they used to share one master clock via props from the
+// top-level CardiacBridge component; now each tab gets its own via the
+// same useLocalClock hook 2C already uses.
+function ConductionSection({ rhythm }) {
+  const cycleMs = rhythm.cycleMs || CYCLE_MS
+  const { clockRef, tMs, isPlaying, toggle, scrub } = useLocalClock(cycleMs, rhythm.nativeCycleMs ?? null)
+  const conductionMap = useMemo(() => buildConductionMap('normalSinus', rhythm.waves), [rhythm.waves])
   const [showVector, setShowVector] = useState(false)
 
   const { structName, cv, note } = useMemo(() => {
@@ -726,19 +1452,19 @@ function ConductionSection({ clockRef, rhythm, conductionMap, masterTimeMs, isPl
       {/* Controls */}
       <div className="flex items-center gap-3 flex-wrap">
         <button
-          onClick={onToggle}
+          onClick={toggle}
           className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-white transition-colors"
         >
           {isPlaying ? 'Pause' : 'Play'}
         </button>
         <button
-          onClick={onStep}
+          onClick={() => scrub((clockRef.current.tInCycle + 10) % cycleMs)}
           className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
         >
           +10 ms
         </button>
         <button
-          onClick={() => onScrub(0)}
+          onClick={() => scrub(0)}
           className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
         >
           Reset
@@ -757,8 +1483,8 @@ function ConductionSection({ clockRef, rhythm, conductionMap, masterTimeMs, isPl
           type="range"
           min={0}
           max={cycleMs}
-          value={tMs}
-          onChange={e => onScrub(Number(e.target.value))}
+          value={Math.round(tMs)}
+          onChange={e => scrub(Number(e.target.value))}
           className="flex-1 min-w-[120px] accent-cyan-500"
         />
         <span className="text-xs font-mono text-gray-500 tabular-nums w-20">{tMs} / {cycleMs} ms</span>
@@ -861,8 +1587,16 @@ function CardiacVectorOverlay({ clockRef, waves, cycleMs, width = 280, height = 
   )
 }
 
-// ── 2D: Cardiac Vector Cycle ───────────────────────────────────────────────
-function VectorCycle({ clockRef, waves, cycleMs, currentTimeMs }) {
+// ── 2E: Cardiac Vector Cycle ───────────────────────────────────────────────
+// Owns its own clock + controls now that 2E is a standalone tab — it used
+// to be silently driven by 2D's master clock (no controls of its own at
+// all). Same useLocalClock hook 2C/2D use; this component was never
+// internally rAF-driven anyway (it repaints via p5's redraw() whenever
+// dataRef's effect fires), so swapping the time source in is a clean drop-in.
+function VectorCycle({ rhythm }) {
+  const cycleMs = rhythm.cycleMs || CYCLE_MS
+  const waves = rhythm.waves
+  const { tMs: currentTimeMs, isPlaying, toggle, scrub } = useLocalClock(cycleMs, rhythm.nativeCycleMs ?? null)
   const containerRef = useRef()
   const p5InstRef = useRef(null)
   const dataRef = useRef({ waves, cycleMs, currentTimeMs })
@@ -874,7 +1608,16 @@ function VectorCycle({ clockRef, waves, cycleMs, currentTimeMs }) {
   }, [waves, cycleMs, currentTimeMs])
 
   useEffect(() => {
+    // RENDER_SCALE shrinks the actual rendered canvas without touching any
+    // of the hand-placed layout constants below (VCX/VCY/VR/EX/EY/etc, W,
+    // H — all stay the original 520×300 logical values every existing draw
+    // call already uses). Only the real <canvas> pixel size (CW/CH) is
+    // smaller; p.draw() wraps its body in p.scale(RENDER_SCALE) so the
+    // logical-space drawing lands correctly on the smaller physical canvas
+    // — same technique used in LeadPlacementLab for the same reason.
+    const RENDER_SCALE = 0.8
     const W = 520, H = 300
+    const CW = Math.round(W * RENDER_SCALE), CH = Math.round(H * RENDER_SCALE)
     const VCX = 115, VCY = 155, VR = 85
     const EX = 248, EW = 255, EY = 80, EH = 160
 
@@ -913,14 +1656,14 @@ function VectorCycle({ clockRef, waves, cycleMs, currentTimeMs }) {
       }
 
       p.setup = () => {
-        const cnv = p.createCanvas(W, H)
+        const cnv = p.createCanvas(CW, CH)
         cnv.elt.style.width = '100%'
         cnv.elt.style.height = 'auto'
         cnv.elt.style.display = 'block'
         // Backing buffer must have enough real pixels for the CSS-stretched
         // display size (plus device pixel ratio) or the upscale looks blurry.
-        const rectW = cnv.elt.getBoundingClientRect().width || W
-        const density = Math.min(3, Math.max(1, rectW / W) * (window.devicePixelRatio || 1))
+        const rectW = cnv.elt.getBoundingClientRect().width || CW
+        const density = Math.min(3, Math.max(1, rectW / CW) * (window.devicePixelRatio || 1))
         p.pixelDensity(density)
         cnv.elt.style.width = '100%'
         cnv.elt.style.height = 'auto'
@@ -930,6 +1673,8 @@ function VectorCycle({ clockRef, waves, cycleMs, currentTimeMs }) {
 
       p.draw = () => {
         p.background(17, 24, 39)
+        p.push()
+        p.scale(RENDER_SCALE)
         const { waves: w, cycleMs: cm, currentTimeMs: tMs } = dataRef.current
 
         if (!ECGCache || ECGCache.length === 0) ECGCache = buildCache(w, cm)
@@ -1113,6 +1858,7 @@ function VectorCycle({ clockRef, waves, cycleMs, currentTimeMs }) {
         p.textSize(7)
         p.textAlign(p.LEFT)
         p.text(`t = ${Math.round(tMs)} ms`, EX, H - 8)
+        p.pop()
       }
     }
 
@@ -1134,13 +1880,46 @@ function VectorCycle({ clockRef, waves, cycleMs, currentTimeMs }) {
   }, [])  // mount once — data comes in via dataRef + redraw()
 
   return (
-    <CanvasWrap containerRef={containerRef}>
-      <SimBar>
-        <span>Left: cardiac vector rotating through P-QRS-T · Right: Lead II strip with current position marker · synchronized with master clock</span>
-      </SimBar>
-    </CanvasWrap>
+    <div>
+      <CanvasWrap containerRef={containerRef}>
+        <SimBar>
+          <span>Left: cardiac vector rotating through P-QRS-T · Right: Lead II strip with current position marker</span>
+        </SimBar>
+      </CanvasWrap>
+      <div className="flex items-center gap-3 flex-wrap mt-3">
+        <button
+          onClick={toggle}
+          className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-white transition-colors"
+        >
+          {isPlaying ? 'Pause' : 'Play'}
+        </button>
+        <button
+          onClick={() => scrub(0)}
+          className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
+        >
+          Reset
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={cycleMs}
+          value={Math.round(currentTimeMs)}
+          onChange={e => scrub(Number(e.target.value))}
+          className="flex-1 min-w-[120px] accent-cyan-500"
+        />
+        <span className="text-xs font-mono text-gray-500 tabular-nums w-20">{Math.round(currentTimeMs)} / {cycleMs} ms</span>
+      </div>
+    </div>
   )
 }
+
+const MODULE2_TABS = [
+  { id: '2A', label: '2A · Anatomy' },
+  { id: '2B', label: '2B · AP by Cell Type' },
+  { id: '2C', label: '2C · AP vs ECG' },
+  { id: '2D', label: '2D · Conduction Animation' },
+  { id: '2E', label: '2E · Vector Cycle' },
+]
 
 // ── Main export ────────────────────────────────────────────────────────────
 export default function CardiacBridge() {
@@ -1152,144 +1931,103 @@ export default function CardiacBridge() {
     }
   }, [])
 
-  const conductionMap = useMemo(
-    () => buildConductionMap('normalSinus', rhythm.waves),
-    [rhythm.waves]
-  )
-
   const axis = useMemo(() => meanQRSAxis(rhythm.waves), [rhythm.waves])
 
-  const masterClockRef = useRef({ tInCycle: 0, cycleMs: CYCLE_MS, nativeCycleMs: null, elapsedMs: 0 })
-  const [masterTimeMs, setMasterTimeMs] = useState(0)
-  const isPlayingRef = useRef(false)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const speedMultRef = useRef(1)
-
-  useEffect(() => {
-    let lastTs = null, raf
-    const tick = (ts) => {
-      if (isPlayingRef.current && lastTs !== null) {
-        const dt = Math.min(ts - lastTs, 50) * speedMultRef.current
-        const cm = rhythm.cycleMs || CYCLE_MS
-        const newT = (masterClockRef.current.tInCycle + dt) % cm
-        masterClockRef.current.tInCycle = newT
-        masterClockRef.current.cycleMs = cm
-        masterClockRef.current.elapsedMs = (masterClockRef.current.elapsedMs || 0) + dt
-        setMasterTimeMs(Math.round(newT))
-      }
-      lastTs = ts
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [rhythm.cycleMs])
-
-  const togglePlay = useCallback(() => {
-    isPlayingRef.current = !isPlayingRef.current
-    setIsPlaying(v => !v)
-  }, [])
-
-  const handleScrub = useCallback((ms) => {
-    masterClockRef.current.tInCycle = ms
-    setMasterTimeMs(ms)
-  }, [])
-
-  const handleStep = useCallback(() => {
-    const cm = rhythm.cycleMs || CYCLE_MS
-    const newT = (masterClockRef.current.tInCycle + 10) % cm
-    masterClockRef.current.tInCycle = newT
-    setMasterTimeMs(Math.round(newT))
-  }, [rhythm.cycleMs])
-
   const [selected2A, setSelected2A] = useState(null)
-  const apHighlight = selected2A ? (ANATOMY[selected2A]?.apType ?? null) : null
+
+  const { active, visited, setActive } = useTabState('cardiac', MODULE2_TABS.map(t => t.id))
+  // Tabs now render as a sub-menu in the sidebar (see Sidebar.jsx) instead
+  // of an in-page pill bar — this just publishes the same state there.
+  usePublishTabs('cardiac', MODULE2_TABS, { active, visited, setActive })
 
   return (
     <ModulePage
       moduleId="cardiac"
       number={2}
       title="Cardiac electrophysiology"
-      objective="Every wave in an ECG corresponds to depolarization or repolarization of a specific anatomical structure. When that structure fails, the wave changes in a predictable way you can reason through — not just recognize."
-      description="This module walks through the heart's electrical system from first principles. Watch the SA node fire, depolarization spread through the atria, slow at the AV node, accelerate through the His-Purkinje system, and sweep through the ventricular myocardium. Each anatomical stage maps directly to a feature of the ECG trace."
     >
-      <Section
-        label="2A"
-        title="Heart Anatomy Overview"
-        subtitle="Hover or click any structure to see its primary function, electrical behavior, and ECG correlation. A click in 2A will highlight the corresponding action potential in 2B."
-      >
-        <AnatomyDiagram selected={selected2A} onSelect={setSelected2A} />
-        <Callout>
-          The SA node is the heart's primary pacemaker — it fires spontaneously without any external trigger.
-          The AV node imposes a deliberate 120–200 ms delay (the PR segment) that allows ventricular filling
-          before systole. The His-Purkinje system then accelerates conduction to near-simultaneous ventricular
-          activation, producing the narrow (&lt;100 ms) QRS complex.
-        </Callout>
-      </Section>
+      {active === '2A' && (
+        <Section
+          label="2A"
+          title="Heart Anatomy Overview"
+          subtitle="Hover or click any structure to see its primary function, electrical behavior, and ECG correlation."
+        >
+          <AnatomyDiagram selected={selected2A} onSelect={setSelected2A} />
+          <Callout>
+            The SA node is the heart's primary pacemaker — it fires spontaneously without any external trigger.
+            The AV node imposes a deliberate 120–200 ms delay (the PR segment) that allows ventricular filling
+            before systole. The His-Purkinje system then accelerates conduction to near-simultaneous ventricular
+            activation, producing the narrow (&lt;100 ms) QRS complex.
+          </Callout>
+        </Section>
+      )}
 
-      <Section
-        label="2B"
-        title="Action Potentials by Cell Type"
-        subtitle="Three fundamentally different action potential shapes — each explained by different ion channel composition. Hover any phase region to see which channels are open and what they do."
-      >
-        <ActionPotentials selectedKey={apHighlight} />
-        <Callout>
-          SA node and AV node use <strong>slow-response</strong> action potentials (ICa-L upstroke, ~0.05 m/s).
-          Atrial and ventricular myocytes use <strong>fast-response</strong> (INa upstroke, 1 m/s).
-          Purkinje fibers have the fastest upstroke (highest dV/dt), longest plateau, and act as tertiary
-          pacemakers (20–40 bpm) if SA and AV nodes both fail.
-        </Callout>
-      </Section>
+      {active === '2B' && (
+        <Section
+          label="2B"
+          title="Action Potentials by Cell Type"
+          subtitle="Three fundamentally different action potential shapes — each explained by different ion channel composition. Hover any phase region to see which channels are open and what they do."
+        >
+          <ActionPotentials selectedKey={null} />
+          <Callout>
+            SA node and AV node use <strong>slow-response</strong> action potentials (ICa-L upstroke, ~0.05 m/s).
+            Atrial and ventricular myocytes use <strong>fast-response</strong> (INa upstroke, 1 m/s).
+            Purkinje fibers have the fastest upstroke (highest dV/dt), longest plateau, and act as tertiary
+            pacemakers (20–40 bpm) if SA and AV nodes both fail.
+          </Callout>
+        </Section>
+      )}
 
-      <Section
-        label="2C"
-        title="Conduction Animation"
-        subtitle="Watch depolarization propagate through the conduction system in real time. Use the scrubber to move to any point in the cardiac cycle, and toggle the cardiac vector to see the net dipole this wavefront produces at each instant."
-      >
-        <ConductionSection
-          clockRef={masterClockRef}
-          rhythm={rhythm}
-          conductionMap={conductionMap}
-          masterTimeMs={masterTimeMs}
-          isPlaying={isPlaying}
-          onToggle={togglePlay}
-          onScrub={handleScrub}
-          onStep={handleStep}
-        />
-        <Callout>
-          The AV node is the rate-limiting step at 0.05 m/s — 20× slower than atrial muscle.
-          Once past the AV node, the His-Purkinje system accelerates conduction 40–80× faster than myocardium,
-          delivering simultaneous endocardial activation across both ventricles.
-        </Callout>
-        <Callout>
-          The boundary between depolarized and resting tissue creates a dipole vector — identical to the
-          dipole model from Module 1. During QRS, the depolarization wavefront sweeps left and inferiorly
-          (toward the dominant LV mass), which is why the normal axis is +60°. During repolarization (T wave),
-          the wave travels epicardium→endocardium (opposite to depolarization), but still produces the same
-          polarity deflection in most leads because the gradient is reversed.
-        </Callout>
-      </Section>
+      {active === '2C' && (
+        <Section
+          label="2C"
+          title="What Does the ECG Actually Record?"
+          subtitle="An intracellular electrode measures voltage across one cell's membrane. The ECG measures the net dipole moment of the entire heart from the body surface. Drag the electrode into a region to compare its action potential with the simultaneous ECG trace."
+        >
+          <ECGVsAPSection rhythm={rhythm} />
+        </Section>
+      )}
 
-      <Section
-        label="2D"
-        title="Cardiac Vector Cycle"
-        subtitle="The cardiac vector rotates through different angles during P, QRS, and T. The projection onto each lead axis determines that lead's deflection — positive projection → upward deflection."
-      >
-        <VectorCycle
-          clockRef={masterClockRef}
-          waves={rhythm.waves}
-          cycleMs={rhythm.cycleMs}
-          currentTimeMs={masterTimeMs}
-        />
-        <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 mb-3">
-          <AxisSummaryPanel angleDeg={axis.angleDeg} leadIMm={axis.leadIMm} leadAVFMm={axis.leadAVFMm} />
-        </div>
-        <Callout>
-          Lead II (60°) is aligned with the normal axis and shows the tallest P wave and R wave.
-          Lead I (0°) projects the leftward component. aVR (−150°) is always negative in a normal heart
-          because the main QRS vector points away from it. The T wave in most leads has the same polarity
-          as the QRS because repolarization proceeds epicardium→endocardium (the same net direction).
-        </Callout>
-      </Section>
+      {active === '2D' && (
+        <Section
+          label="2D"
+          title="Conduction Animation"
+          subtitle="Watch depolarization propagate through the conduction system in real time. Use the scrubber to move to any point in the cardiac cycle, and toggle the cardiac vector to see the net dipole this wavefront produces at each instant."
+        >
+          <ConductionSection rhythm={rhythm} />
+          <Callout>
+            The AV node is the rate-limiting step at 0.05 m/s — 20× slower than atrial muscle.
+            Once past the AV node, the His-Purkinje system accelerates conduction 40–80× faster than myocardium,
+            delivering simultaneous endocardial activation across both ventricles.
+          </Callout>
+          <Callout>
+            The boundary between depolarized and resting tissue creates a dipole vector — identical to the
+            dipole model from Module 1. During QRS, the depolarization wavefront sweeps left and inferiorly
+            (toward the dominant LV mass), which is why the normal axis is +60°. During repolarization (T wave),
+            the wave travels epicardium→endocardium (opposite to depolarization), but still produces the same
+            polarity deflection in most leads because the gradient is reversed.
+          </Callout>
+        </Section>
+      )}
+
+      {active === '2E' && (
+        <Section
+          label="2E"
+          title="Cardiac Vector Cycle"
+          subtitle="The cardiac vector rotates through different angles during P, QRS, and T. The projection onto each lead axis determines that lead's deflection — positive projection → upward deflection."
+        >
+          <VectorCycle rhythm={rhythm} />
+          <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 mb-3 mt-3">
+            <AxisSummaryPanel angleDeg={axis.angleDeg} leadIMm={axis.leadIMm} leadAVFMm={axis.leadAVFMm} />
+          </div>
+          <Callout>
+            Lead II (60°) is aligned with the normal axis and shows the tallest P wave and R wave.
+            Lead I (0°) projects the leftward component. aVR (−150°) is always negative in a normal heart
+            because the main QRS vector points away from it. The T wave in most leads has the same polarity
+            as the QRS because repolarization proceeds epicardium→endocardium (the same net direction).
+          </Callout>
+        </Section>
+      )}
     </ModulePage>
   )
 }

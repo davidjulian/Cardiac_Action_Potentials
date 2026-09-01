@@ -1,6 +1,7 @@
 ﻿import { useLocation, useNavigate, NavLink } from 'react-router-dom'
-import { useMode, MODULE_ORDER, MODULE_INFO } from '../../context/ModeContext'
+import { useMode, MODULE_ORDER, MODULE_INFO, MODE_ACCENT } from '../../context/ModeContext'
 import { useAuth } from '../../context/AuthContext'
+import { useModuleTabsContext } from '../../context/ModuleTabsContext'
 
 // Small SVG icons defined inline so we don't need an icon library yet
 function CheckIcon()  { return <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg> }
@@ -14,8 +15,9 @@ export default function Sidebar({ isLabMode }) {
   const { signOut } = useAuth()
   const location    = useLocation()
   const navigate    = useNavigate()
+  const { tabInfo } = useModuleTabsContext()
 
-  const accent    = isLabMode ? '#818cf8' : '#2dd4bf'   // purple for Lab, teal for Free Play
+  const accent    = MODE_ACCENT[isLabMode ? 'lab' : 'free']   // purple for Lab, teal for Free Play
   const basePath  = isLabMode ? '/lab' : '/play'
   const modeLabel = isLabMode ? 'Lab mode' : 'Free play'
 
@@ -66,35 +68,69 @@ export default function Sidebar({ isLabMode }) {
             )
           }
 
-          // Accessible item
+          // Accessible item. When this is the currently-open module AND it's
+          // published a tab list (see usePublishTabs in ModuleTabs.jsx —
+          // only Module 1/2 do this), show its tabs as a nested sub-menu
+          // right under it, instead of the old in-page pill bar.
+          const showTabs = isActive && tabInfo && tabInfo.moduleId === moduleId
+
           return (
-            <NavLink
-              key={moduleId}
-              to={path}
-              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors text-sm ${
-                isActive
-                  ? 'bg-gray-800 text-white'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
-              }`}
-            >
-              {/* Number badge — turns into a checkmark when completed */}
-              <span
-                className="w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 font-mono transition-colors"
-                style={{
-                  backgroundColor: completed ? accent + '20' : isActive ? '#1f2937' : 'transparent',
-                  color:           completed ? accent : isActive ? '#e5e7eb' : '#6b7280',
-                  border:          `1px solid ${completed ? accent + '50' : '#374151'}`,
-                }}
+            <div key={moduleId}>
+              <NavLink
+                to={path}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-colors text-sm ${
+                  isActive
+                    ? 'bg-gray-800 text-white'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
+                }`}
               >
-                {completed ? <CheckIcon /> : info.number}
-              </span>
+                {/* Number badge — turns into a checkmark when completed */}
+                <span
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 font-mono transition-colors"
+                  style={{
+                    backgroundColor: completed ? accent + '20' : isActive ? '#1f2937' : 'transparent',
+                    color:           completed ? accent : isActive ? '#e5e7eb' : '#6b7280',
+                    border:          `1px solid ${completed ? accent + '50' : '#374151'}`,
+                  }}
+                >
+                  {completed ? <CheckIcon /> : info.number}
+                </span>
 
-              <span className="flex-1 leading-tight">{info.label}</span>
+                <span className="flex-1 leading-tight">{info.label}</span>
 
-              {completed && !isActive && (
-                <span style={{ color: accent + '80' }}><CheckIcon /></span>
+                {completed && !isActive && (
+                  <span style={{ color: accent + '80' }}><CheckIcon /></span>
+                )}
+              </NavLink>
+
+              {showTabs && (
+                <div className="mt-0.5 ml-4 pl-2.5 border-l border-gray-800 space-y-0.5">
+                  {tabInfo.tabs.map(tab => {
+                    const tabActive = tab.id === tabInfo.active
+                    const tabVisited = tabInfo.visited?.has(tab.id)
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => tabInfo.setActive(tab.id)}
+                        className={`w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-left text-xs transition-colors ${
+                          tabActive ? '' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/60'
+                        }`}
+                        style={tabActive ? { backgroundColor: accent + '18', color: accent } : undefined}
+                      >
+                        <span className="flex-1 leading-tight">{tab.label}</span>
+                        {!tabActive && tabVisited && (
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ backgroundColor: accent }}
+                            title="Visited"
+                          />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
               )}
-            </NavLink>
+            </div>
           )
         })}
       </nav>

@@ -1,5 +1,5 @@
 ﻿import { useNavigate } from 'react-router-dom'
-import { useMode, MODULE_ORDER } from '../context/ModeContext'
+import { useMode, MODULE_ORDER, MODE_ACCENT } from '../context/ModeContext'
 
 /**
  * ModulePage — the visual shell every module page renders inside.
@@ -8,10 +8,9 @@ import { useMode, MODULE_ORDER } from '../context/ModeContext'
  *   moduleId    — 'physics' | 'cardiac' | 'ECG' | 'scenarios'
  *   number      — 1-4
  *   title       — display title
- *   objective   — the single "aha moment" statement for this module.
- *                 Optional — omit to skip the objective box entirely
- *                 (e.g. for a module whose layout is tight on space).
- *   description — a paragraph describing what the module covers
+ *   objective   — optional single "aha moment" statement, shown as a
+ *                 compact inline box under the header. Omit to skip it.
+ *   description — optional short paragraph under the header. Omit to skip.
  *   wide        — when true, use a considerably wider container and
  *                 tighter outer padding, for modules that need real
  *                 horizontal room for a multi-column dashboard layout
@@ -24,7 +23,7 @@ export default function ModulePage({ moduleId, number, title, objective, descrip
 
   const isLabMode  = mode === 'lab'
   const isComplete = progress.has(moduleId)
-  const accent     = isLabMode ? '#818cf8' : '#2dd4bf'
+  const accent     = MODE_ACCENT[isLabMode ? 'lab' : 'free']
 
   const nextId   = MODULE_ORDER[MODULE_ORDER.indexOf(moduleId) + 1]
   const nextPath = nextId ? `/${isLabMode ? 'lab' : 'play'}/${nextId}` : null
@@ -35,14 +34,14 @@ export default function ModulePage({ moduleId, number, title, objective, descrip
   }
 
   return (
-    <div className={`min-h-screen mx-auto ${wide ? 'p-5 max-w-[1500px]' : 'p-8 max-w-4xl'}`}>
+    <div className={`min-h-screen mx-auto ${wide ? 'p-4 max-w-[1500px]' : 'p-5 max-w-4xl'}`}>
 
-      {/* ── Module header ── */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
+      {/* ── Module header — kept compact since it repeats above every tab ── */}
+      <div className="mb-3">
+        <div className="flex items-center gap-3">
           {/* Module number pill */}
           <span
-            className="text-xs font-semibold uppercase tracking-widest px-2.5 py-1 rounded-full"
+            className="text-xs font-semibold uppercase tracking-widest px-2.5 py-0.5 rounded-full"
             style={{
               color:           accent,
               backgroundColor: accent + '18',
@@ -53,36 +52,38 @@ export default function ModulePage({ moduleId, number, title, objective, descrip
           </span>
 
           {isComplete && (
-            <span className="text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2.5 py-1 rounded-full">
+            <span className="text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2.5 py-0.5 rounded-full">
               ✓ Completed
             </span>
           )}
-        </div>
 
-        <h1 className={`text-2xl font-bold text-white ${objective ? 'mb-5' : 'mb-3'}`}>{title}</h1>
+          <h1 className="text-lg font-bold text-white">{title}</h1>
+        </div>
 
         {/* Learning objective box — the "aha moment" — optional */}
         {objective && (
           <div
-            className="rounded-xl p-4 border"
+            className="mt-1.5 rounded-lg px-3 py-1.5 border flex items-baseline gap-2"
             style={{ backgroundColor: accent + '0c', borderColor: accent + '30' }}
           >
             <p
-              className="text-xs uppercase tracking-widest font-semibold mb-2"
+              className="text-[10px] uppercase tracking-widest font-semibold shrink-0"
               style={{ color: accent + 'aa' }}
             >
-              Learning objective
+              Objective
             </p>
-            <p className="text-sm text-gray-200 leading-relaxed">{objective}</p>
+            <p className="text-xs text-gray-300 leading-snug">{objective}</p>
           </div>
+        )}
+
+        {/* Module description — optional */}
+        {description && (
+          <p className="text-gray-500 text-xs leading-snug mt-1.5">{description}</p>
         )}
       </div>
 
-      {/* ── Module description ── */}
-      <p className="text-gray-400 text-sm leading-relaxed mb-8">{description}</p>
-
       {/* ── Interactive content ── */}
-      <div className="mb-10">
+      <div className="mb-3">
         {children ?? (
           <div className="rounded-2xl bg-gray-900 border border-gray-800 border-dashed p-16 text-center">
             <div
@@ -104,7 +105,7 @@ export default function ModulePage({ moduleId, number, title, objective, descrip
 
       {/* ── Lab Mode: mark complete / advance ── */}
       {isLabMode && (
-        <div className="border-t border-gray-800 pt-6 flex items-center justify-between">
+        <div className="border-t border-gray-800 pt-3 flex items-center justify-between">
           <p className="text-xs text-gray-600">
             {isComplete
               ? 'This module is complete.'
@@ -114,7 +115,7 @@ export default function ModulePage({ moduleId, number, title, objective, descrip
           {!isComplete ? (
             <button
               onClick={handleMarkComplete}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all hover:opacity-90"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90"
               style={{
                 backgroundColor: accent + '20',
                 color:           accent,
@@ -131,7 +132,7 @@ export default function ModulePage({ moduleId, number, title, objective, descrip
           ) : nextPath ? (
             <button
               onClick={() => navigate(nextPath)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors"
             >
               Continue to next module
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

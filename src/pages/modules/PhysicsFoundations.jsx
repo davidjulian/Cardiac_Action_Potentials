@@ -2,12 +2,21 @@
 import p5 from 'p5'
 import ModulePage from '../../components/ModulePage'
 import LeadPlacementLab from '../../components/LeadPlacementLab'
+import { useTabState, usePublishTabs } from '../../components/ModuleTabs'
+
+const TABS = [
+  { id: '1A', label: '1A · Charges' },
+  { id: '1B', label: '1B · Dipole' },
+  { id: '1C', label: '1C · Dot Product' },
+  { id: '1D', label: '1D · Depolarization' },
+  { id: '1E', label: '1E · Lead Placement' },
+]
 
 // ── Layout helpers ────────────────────────────────────────────────────────────
 function Section({ label, title, children }) {
   return (
-    <div className="mb-10">
-      <div className="flex items-center gap-3 mb-3">
+    <div className="mb-2">
+      <div className="flex items-center gap-3 mb-1.5">
         <span className="text-xs font-semibold uppercase tracking-widest text-teal-500/80 bg-teal-950/40 border border-teal-800/40 px-2 py-0.5 rounded-full">
           {label}
         </span>
@@ -21,7 +30,7 @@ function Section({ label, title, children }) {
 function Callout({ children, accent = '#2dd4bf' }) {
   return (
     <div
-      className="rounded-xl p-4 text-sm text-gray-300 leading-relaxed mb-3"
+      className="rounded-lg px-3 py-2 text-xs text-gray-300 leading-snug mb-1.5"
       style={{ backgroundColor: accent + '0c', borderLeft: `3px solid ${accent}50` }}
     >
       {children}
@@ -31,8 +40,8 @@ function Callout({ children, accent = '#2dd4bf' }) {
 
 function Equation({ children, label }) {
   return (
-    <div className="flex items-center gap-4 my-3">
-      <div className="flex-1 rounded-lg bg-gray-900 border border-gray-800 px-5 py-3 font-mono text-sm text-indigo-300 text-center">
+    <div className="flex items-center gap-4 my-1.5">
+      <div className="flex-1 rounded-lg bg-gray-900 border border-gray-800 px-4 py-1.5 font-mono text-sm text-indigo-300 text-center">
         {children}
       </div>
       {label && <p className="text-xs text-gray-600 w-36 leading-tight">{label}</p>}
@@ -40,13 +49,26 @@ function Equation({ children, label }) {
   )
 }
 
-function ForwardLink({ children }) {
+// When `onNext` is given, the pill becomes a real "advance to the next tab"
+// button instead of just a static label — the tabs replaced the old
+// continuous-scroll flow, so this is how that same forward momentum still
+// works.
+function ForwardLink({ children, onNext }) {
   return (
-    <div className="flex items-center gap-3 mt-5 mb-1 text-xs text-gray-600">
+    <div className="flex items-center gap-3 mt-2 mb-1 text-xs text-gray-600">
       <div className="flex-1 h-px bg-gray-800" />
-      <span className="shrink-0 px-3 py-1 rounded-full border border-gray-800 text-gray-600">
-        {children}
-      </span>
+      {onNext ? (
+        <button
+          onClick={onNext}
+          className="shrink-0 px-3 py-1 rounded-full border border-teal-800/50 text-teal-400 hover:bg-teal-950/40 transition-colors"
+        >
+          {children} →
+        </button>
+      ) : (
+        <span className="shrink-0 px-3 py-1 rounded-full border border-gray-800 text-gray-600">
+          {children}
+        </span>
+      )}
       <div className="flex-1 h-px bg-gray-800" />
     </div>
   )
@@ -78,13 +100,18 @@ function Sim1A() {
   useEffect(() => { showEqRef.current = showEq }, [showEq])
 
   useEffect(() => {
-    const W = 720, H = 400, K = 38000, CR = 11
+    // Scaled to ~0.78x the original 720×400 (uniform factor f applied to
+    // every distance constant — canvas, charge offset, radius — plus K
+    // scaled by the same f so potential ∝ K/r keeps the same visual
+    // magnitude at the smaller size) so the sim fits on-screen alongside
+    // its own tab's text/Callout without changing how the field looks.
+    const W = 560, H = 310, K = 29556, CR = 9
     let cancelled = false
 
     const sketch = (p) => {
       const charges = [
-        { x: W / 2 - 140, y: H / 2, q: 1 },
-        { x: W / 2 + 140, y: H / 2, q: -1 },
+        { x: W / 2 - 109, y: H / 2, q: 1 },
+        { x: W / 2 + 109, y: H / 2, q: -1 },
       ]
       let dragging = null
       let lastTap = { t: 0, i: -1 }
@@ -220,7 +247,7 @@ function Sim1A() {
       }
 
       // ── Equipotentials: marching squares over a cached voltage grid ──
-      const gsEq = 8, cols = W / gsEq, rows = H / gsEq
+      const gsEq = 6, cols = W / gsEq, rows = H / gsEq
       const cornerV = new Float32Array((cols + 1) * (rows + 1))
 
       function computeCornerGrid() {
@@ -232,7 +259,7 @@ function Sim1A() {
 
       function pickLevels() {
         let maxV = 0
-        const step = 24
+        const step = 18
         for (let x = step / 2; x < W; x += step) {
           for (let y = step / 2; y < H; y += step) {
             let near = false
@@ -404,7 +431,9 @@ function Sim1B() {
   const containerRef = useRef()
 
   useEffect(() => {
-    const W = 720, H = 420, K = 50000, SEP = 108
+    // Scaled ~0.78x from the original 720×420 (same uniform-factor rule as
+    // Sim1A — see its comment).
+    const W = 560, H = 327, K = 38889, SEP = 84
     let cancelled = false
 
     const sketch = (p) => {
@@ -521,8 +550,8 @@ function Sim1B() {
 
       p.mousePressed = () => {
         if (p.mouseX < 0 || p.mouseX > W || p.mouseY < 0 || p.mouseY > H) return
-        if (Math.hypot(p.mouseX - testPt.x, p.mouseY - testPt.y) < 14) { dragTest = true; return }
-        if (Math.hypot(p.mouseX - W / 2, p.mouseY - H / 2) < 115) dragDipole = true
+        if (Math.hypot(p.mouseX - testPt.x, p.mouseY - testPt.y) < 11) { dragTest = true; return }
+        if (Math.hypot(p.mouseX - W / 2, p.mouseY - H / 2) < 89) dragDipole = true
       }
       p.mouseDragged = () => {
         if (dragTest) { testPt.x = p.mouseX; testPt.y = p.mouseY; return }
@@ -570,12 +599,14 @@ function Sim1DCells() {
   useEffect(() => { showCurrentRef.current = showCurrent }, [showCurrent])
 
   useEffect(() => {
-    const W = 720, H = 480, K = 38000
+    // Scaled ~0.78x from the original 720×480 (same uniform-factor rule as
+    // Sim1A — see its comment).
+    const W = 560, H = 375, K = 29556
     const N = 10
     const QMAX = 1
-    const MARGIN_X = 70, GAP = 8
+    const MARGIN_X = 54, GAP = 6
     const CELL_W = (W - 2 * MARGIN_X - (N - 1) * GAP) / N
-    const CELL_H = 60
+    const CELL_H = 47
     const ROW_Y = H * 0.54
     const CX = W / 2
 
@@ -597,9 +628,9 @@ function Sim1DCells() {
       // Two draggable probes — the actual "electrodes" reading the voltage
       // this changing charge distribution produces, so ΔV isn't an
       // unexplained number: it's V(A) − V(B) measured at two real points.
-      const PR = 9
-      let probeA = { x: xs[0] - 40, y: ROW_Y - CELL_H / 2 - 32 }
-      let probeB = { x: xs[N - 1] + 40, y: ROW_Y - CELL_H / 2 - 32 }
+      const PR = 7
+      let probeA = { x: xs[0] - 31, y: ROW_Y - CELL_H / 2 - 25 }
+      let probeB = { x: xs[N - 1] + 31, y: ROW_Y - CELL_H / 2 - 25 }
       let dragA = false, dragB = false
 
       function smooth(f) { return f * f * (3 - 2 * f) }
@@ -662,7 +693,7 @@ function Sim1DCells() {
         return [ex, ey]
       }
 
-      const CR = 6
+      const CR = 5
       function traceField(sx, sy, source, cs) {
         const pts = [[sx, sy]]
         let x = sx, y = sy
@@ -740,7 +771,7 @@ function Sim1DCells() {
       }
 
       // ── Equipotentials: marching squares over a per-frame voltage grid ──
-      const gsEq = 8, cols = Math.round(W / gsEq), rows = Math.round(H / gsEq)
+      const gsEq = 6, cols = Math.round(W / gsEq), rows = Math.round(H / gsEq)
       const cornerV = new Float32Array((cols + 1) * (rows + 1))
 
       function computeCornerGrid(cs) {
@@ -752,7 +783,7 @@ function Sim1DCells() {
 
       function pickLevels(cs) {
         let maxV = 0
-        const step = 24
+        const step = 19
         for (let x = step / 2; x < W; x += step) {
           for (let y = step / 2; y < H; y += step) {
             let near = false
@@ -1034,16 +1065,18 @@ function Sim1D() {
   const containerRef = useRef()
 
   useEffect(() => {
-    const W = 720, H = 450
+    // Scaled ~0.78x from the original 720×450 (same uniform-factor rule as
+    // Sim1A — see its comment).
+    const W = 560, H = 350
     const OX = W / 2, OY = H / 2
     let cancelled = false
 
     const sketch = (p) => {
-      let vecA = { x: 96, y: -72 }
-      let vecB = { x: 138, y: 34 }
+      let vecA = { x: 75, y: -56 }
+      let vecB = { x: 107, y: 26 }
       let dragA = false, dragB = false
-      const DR = 14
-      const GRID = 48
+      const DR = 11
+      const GRID = 37
 
       function dot(a, b) { return a.x * b.x + a.y * b.y }
       function mag(v) { return Math.hypot(v.x, v.y) }
@@ -1196,162 +1229,173 @@ function Sim1D() {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function PhysicsFoundations() {
+  const { active, visited, setActive } = useTabState('physics', TABS.map(t => t.id))
+  // Tabs now render as a sub-menu in the sidebar (see Sidebar.jsx) instead
+  // of an in-page pill bar — this just publishes the same state there.
+  usePublishTabs('physics', TABS, { active, visited, setActive })
+
   return (
     <ModulePage
       moduleId="physics"
       number={1}
       title="Physics foundations"
-      objective="An ECG does not directly record the heart's electrical signal. It records the projection of the net cardiac dipole vector onto a lead axis — a geometric operation you already know from Physics 2."
-      description="This module rebuilds the bridge between Physics 2 and cardiology. You will interactively explore how point charges create electric fields, how a dipole emerges from charge separation, what voltage actually measures between two points, and how projecting a moving vector onto different axes produces different waveform amplitudes. By the end, Einthoven's Triangle will feel like a natural consequence of vector projection — not a memorized fact."
     >
-
       {/* ── 1A ──────────────────────────────────────────────────────────────── */}
-      <Section label="1A" title="Point charges create an electric field and potential">
-        <p className="text-sm text-gray-400 leading-relaxed mb-3">
-          Add charges to the canvas. The colored background is the electric potential V at every
-          point — blue = positive, amber = negative. White lines are field lines: they leave +
-          charges and arrive at − charges, tracing the direction a positive test charge would move.
-          Toggle equipotentials to see the iso-V contours that run perpendicular to field lines.
-        </p>
+      {active === '1A' && (
+        <Section label="1A" title="Point charges create an electric field and potential">
+          <p className="text-xs text-gray-400 leading-snug mb-2">
+            Add charges to the canvas. The colored background is the electric potential V at every
+            point — blue = positive, amber = negative. White lines are field lines: they leave +
+            charges and arrive at − charges, tracing the direction a positive test charge would move.
+            Toggle equipotentials to see the iso-V contours that run perpendicular to field lines.
+          </p>
 
-        <Sim1A />
+          <Sim1A />
 
-        <Callout>
-          <strong className="text-white">Insight:</strong> When cardiac muscle depolarizes, positive
-          ions rush into cells and a charge separation forms across the wavefront — positive charges
-          ahead, negative charges behind. This is the same physics as two opposite charges on the canvas.
-          The net effect at electrode distance approximates a single equivalent dipole.
-        </Callout>
+          <Callout>
+            <strong className="text-white">Insight:</strong> When cardiac muscle depolarizes, positive
+            ions rush into cells and a charge separation forms across the wavefront — positive charges
+            ahead, negative charges behind. This is the same physics as two opposite charges on the canvas.
+            The net effect at electrode distance approximates a single equivalent dipole.
+          </Callout>
 
-        <ForwardLink>continues in 1B — the dipole model</ForwardLink>
-      </Section>
+          <ForwardLink onNext={() => setActive('1B')}>continues in 1B — the dipole model</ForwardLink>
+        </Section>
+      )}
 
       {/* ── 1B ──────────────────────────────────────────────────────────────── */}
-      <Section label="1B" title="A dipole: the simplest model of the heart's field">
-        <p className="text-sm text-gray-400 leading-relaxed mb-3">
-          A dipole is a locked +/− pair with a fixed separation. Rotate it by dragging the center.
-          Move the green probe to any point and read the voltage there. Notice that V depends on both
-          the probe's distance from the center <em>and</em> the angle between the probe and the dipole axis.
-        </p>
+      {active === '1B' && (
+        <Section label="1B" title="A dipole: the simplest model of the heart's field">
+          <p className="text-xs text-gray-400 leading-snug mb-2">
+            A dipole is a locked +/− pair with a fixed separation. Rotate it by dragging the center.
+            Move the green probe to any point and read the voltage there. Notice that V depends on both
+            the probe's distance from the center <em>and</em> the angle between the probe and the dipole axis.
+          </p>
 
-        <Equation label="θ = angle between dipole axis and probe direction">
-          {'V(r, θ) ≈ (kp cos θ) / r²'}
-        </Equation>
+          <Equation label="θ = angle between dipole axis and probe direction">
+            {'V(r, θ) ≈ (kp cos θ) / r²'}
+          </Equation>
 
-        <Sim1B />
+          <Sim1B />
 
-        <Callout>
-          <strong className="text-white">Insight:</strong> At distances large compared to the
-          charge separation (true for skin electrodes), any distribution of charge looks like a
-          single dipole. The entire heart's electrical activity at each instant collapses to one
-          rotating vector <strong className="text-white">p⃗</strong> — this is why the cardiac
-          dipole model works.
-        </Callout>
+          <Callout>
+            <strong className="text-white">Insight:</strong> At distances large compared to the
+            charge separation (true for skin electrodes), any distribution of charge looks like a
+            single dipole. The entire heart's electrical activity at each instant collapses to one
+            rotating vector <strong className="text-white">p⃗</strong> — this is why the cardiac
+            dipole model works.
+          </Callout>
 
-        <ForwardLink>continues in 1C — the dot product projects the dipole onto a measurement axis</ForwardLink>
-      </Section>
+          <ForwardLink onNext={() => setActive('1C')}>continues in 1C — the dot product projects the dipole onto a measurement axis</ForwardLink>
+        </Section>
+      )}
 
       {/* ── 1C ──────────────────────────────────────────────────────────────── */}
-      <Section label="1C" title="The dot product: what every lead does to the cardiac vector">
-        <p className="text-sm text-gray-400 leading-relaxed mb-3">
-          Vector <strong className="text-blue-400">A</strong> is the cardiac dipole at one instant.
-          Vector <strong className="text-amber-400">B</strong> is the lead axis (the direction from −
-          electrode to + electrode). The ECG voltage recorded by that lead is A&thinsp;·&thinsp;B.
-          The dashed line shows the projection of A onto B; the thick blue segment on the B axis
-          shows its signed length.
-        </p>
+      {active === '1C' && (
+        <Section label="1C" title="The dot product: what every lead does to the cardiac vector">
+          <p className="text-xs text-gray-400 leading-snug mb-2">
+            Vector <strong className="text-blue-400">A</strong> is the cardiac dipole at one instant.
+            Vector <strong className="text-amber-400">B</strong> is the lead axis (the direction from −
+            electrode to + electrode). The ECG voltage recorded by that lead is A&thinsp;·&thinsp;B.
+            The dashed line shows the projection of A onto B; the thick blue segment on the B axis
+            shows its signed length.
+          </p>
 
-        <Equation label="θ = angle between cardiac vector and lead axis">
-          {'V_lead = A · B = |A| |B| cos θ'}
-        </Equation>
+          <Equation label="θ = angle between cardiac vector and lead axis">
+            {'V_lead = A · B = |A| |B| cos θ'}
+          </Equation>
 
-        <Sim1D />
+          <Sim1D />
 
-        <div className="grid grid-cols-3 gap-3 text-sm mb-3">
-          {[
-            { θ: '0°',   result: 'cos θ = 1',  desc: 'Lead parallel to cardiac vector → maximum positive deflection', color: '#3b82f6' },
-            { θ: '90°',  result: 'cos θ = 0',  desc: 'Lead perpendicular → isoelectric (flat line)',                  color: '#6b7280' },
-            { θ: '180°', result: 'cos θ = −1', desc: 'Lead anti-parallel → maximum negative (inverted waveform)',     color: '#f59e0b' },
-          ].map(({ θ, result, desc, color }) => (
-            <div key={θ} className="rounded-xl bg-gray-900 border border-gray-800 p-3">
-              <p className="font-mono text-lg font-bold mb-1" style={{ color }}>θ = {θ}</p>
-              <p className="font-mono text-xs text-gray-400 mb-2">{result}</p>
-              <p className="text-xs text-gray-500 leading-snug">{desc}</p>
-            </div>
-          ))}
-        </div>
-
-        <Callout>
-          <strong className="text-white">Insight:</strong> Every ECG lead is a fixed axis (B).
-          The cardiac dipole rotates through one full arc per heartbeat (A sweeps through time).
-          The waveform you see on screen is simply A&thinsp;·&thinsp;B plotted against time — the
-          dot product of a rotating vector onto a stationary axis. Leads aligned with the mean
-          cardiac axis see tall complexes; leads perpendicular to it see flat lines.
-        </Callout>
-
-        <ForwardLink>continues in 1D — how a depolarizing cell actually generates that dipole</ForwardLink>
-      </Section>
-
-      {/* ── 1D ──────────────────────────────────────────────────────────────── */}
-      <Section label="1D" title="Depolarization and repolarization of a cell generate a dipole">
-        <p className="text-sm text-gray-400 leading-relaxed mb-3">
-          Ten cells sit side by side, each polarized (+ outside) at rest. Press play: a wave of
-          depolarization sweeps left→right, flipping each cell's exterior charge negative in turn,
-          then each cell repolarizes back to positive in the same order. Watch the net dipole
-          vector above the row — it isn't just the boundary between two cells, it's the sum of
-          every cell's charge state at that instant. Drag the <span className="text-emerald-400">teal (A)</span> and{' '}
-          <span className="text-purple-400">purple (B)</span> probes to see the actual voltage the
-          cells' changing charges produce at any point, and watch ΔV = V(A) − V(B) in the panel below —
-          this is exactly how a real electrode pair would measure it. Toggle field lines,
-          equipotentials, or current lines to see the field itself.
-        </p>
-
-        <Sim1DCells />
-
-        <Callout>
-          <strong className="text-white">Insight:</strong> The strip-chart traces p(t) = Σ sᵢ(t)·(xᵢ−cx) —
-          it rises, peaks, and falls as the wave crosses the row, the same shape as a real QRS
-          complex. Notice the vector <em>reverses direction</em> during repolarization: the same
-          left→right activation order now sweeps recovery instead of depolarization, so the
-          negative and positive centroids swap sides. This is exactly the dipole from 1A/1B — here
-          you're watching it being generated cell by cell instead of assuming it, and the two
-          probes show that it's also directly measurable as a plain voltage difference, just like
-          1E's electrodes.
-        </Callout>
-
-        <ForwardLink>continues in 1E — place real electrodes on a body and see the projection live</ForwardLink>
-      </Section>
-
-      {/* ── 1E: Interactive Lead Placement Lab — the payoff ──────────────── */}
-      <Section label="1E" title="Interactive: place electrodes and see the projection in real time">
-        <Callout accent="#818cf8">
-          <strong className="text-white">This is the conceptual payoff of sections 1A–1D.</strong>{' '}
-          Drag the electrodes anywhere on the body. Watch the ECG strip respond to the dot product
-          between the rotating cardiac dipole and your lead axis. Try placing your lead parallel to
-          Lead II — you'll get the biggest QRS. Rotate 90° — the line goes flat. The physics is
-          identical to projecting vector A onto vector B in section 1D.
-        </Callout>
-
-        <LeadPlacementLab />
-
-        <div className="mt-4 rounded-xl bg-gray-900/70 border border-gray-800 p-4">
-          <p className="text-xs uppercase tracking-widest text-gray-600 mb-3">Guided experiments</p>
-          <div className="grid grid-cols-2 gap-3 text-xs text-gray-400">
+          <div className="grid grid-cols-3 gap-3 text-sm mb-3">
             {[
-              { n: '1', text: 'Place electrodes horizontally (left−right). This approximates Lead I (0°). Notice the P wave and T wave are positive, QRS tallest.' },
-              { n: '2', text: 'Rotate to approximately 60° (upper-left to lower-right). This is Lead II — the axis closest to the mean cardiac vector. Maximum QRS amplitude.' },
-              { n: '3', text: 'Place the axis perpendicular to Lead II (~−30°, upper-right to lower-left). The ECG approaches a flat line — pure isoelectric.' },
-              { n: '4', text: 'Flip the electrodes (swap + and −). The waveform inverts. Same axis, opposite polarity — amplitude unchanged, sign flipped.' },
-            ].map(({ n, text }) => (
-              <div key={n} className="flex gap-2.5">
-                <span className="shrink-0 w-5 h-5 rounded-full bg-teal-950/60 border border-teal-800/50 text-teal-400 text-xs font-bold flex items-center justify-center">{n}</span>
-                <p className="leading-relaxed">{text}</p>
+              { θ: '0°',   result: 'cos θ = 1',  desc: 'Lead parallel to cardiac vector → maximum positive deflection', color: '#3b82f6' },
+              { θ: '90°',  result: 'cos θ = 0',  desc: 'Lead perpendicular → isoelectric (flat line)',                  color: '#6b7280' },
+              { θ: '180°', result: 'cos θ = −1', desc: 'Lead anti-parallel → maximum negative (inverted waveform)',     color: '#f59e0b' },
+            ].map(({ θ, result, desc, color }) => (
+              <div key={θ} className="rounded-xl bg-gray-900 border border-gray-800 p-3">
+                <p className="font-mono text-lg font-bold mb-1" style={{ color }}>θ = {θ}</p>
+                <p className="font-mono text-xs text-gray-400 mb-2">{result}</p>
+                <p className="text-xs text-gray-500 leading-snug">{desc}</p>
               </div>
             ))}
           </div>
-        </div>
-      </Section>
 
+          <Callout>
+            <strong className="text-white">Insight:</strong> Every ECG lead is a fixed axis (B).
+            The cardiac dipole rotates through one full arc per heartbeat (A sweeps through time).
+            The waveform you see on screen is simply A&thinsp;·&thinsp;B plotted against time — the
+            dot product of a rotating vector onto a stationary axis. Leads aligned with the mean
+            cardiac axis see tall complexes; leads perpendicular to it see flat lines.
+          </Callout>
+
+          <ForwardLink onNext={() => setActive('1D')}>continues in 1D — how a depolarizing cell actually generates that dipole</ForwardLink>
+        </Section>
+      )}
+
+      {/* ── 1D ──────────────────────────────────────────────────────────────── */}
+      {active === '1D' && (
+        <Section label="1D" title="Depolarization and repolarization of a cell generate a dipole">
+          <p className="text-xs text-gray-400 leading-snug mb-2">
+            Ten cells sit side by side, each polarized (+ outside) at rest. Press play: a wave of
+            depolarization sweeps left→right, flipping each cell's exterior charge negative in turn,
+            then each cell repolarizes back to positive in the same order. Watch the net dipole
+            vector above the row — it isn't just the boundary between two cells, it's the sum of
+            every cell's charge state at that instant. Drag the <span className="text-emerald-400">teal (A)</span> and{' '}
+            <span className="text-purple-400">purple (B)</span> probes to see the actual voltage the
+            cells' changing charges produce at any point, and watch ΔV = V(A) − V(B) in the panel below —
+            this is exactly how a real electrode pair would measure it. Toggle field lines,
+            equipotentials, or current lines to see the field itself.
+          </p>
+
+          <Sim1DCells />
+
+          <Callout>
+            <strong className="text-white">Insight:</strong> The strip-chart traces p(t) = Σ sᵢ(t)·(xᵢ−cx) —
+            it rises, peaks, and falls as the wave crosses the row, the same shape as a real QRS
+            complex. Notice the vector <em>reverses direction</em> during repolarization: the same
+            left→right activation order now sweeps recovery instead of depolarization, so the
+            negative and positive centroids swap sides. This is exactly the dipole from 1A/1B — here
+            you're watching it being generated cell by cell instead of assuming it, and the two
+            probes show that it's also directly measurable as a plain voltage difference, just like
+            1E's electrodes.
+          </Callout>
+
+          <ForwardLink onNext={() => setActive('1E')}>continues in 1E — place real electrodes on a body and see the projection live</ForwardLink>
+        </Section>
+      )}
+
+      {/* ── 1E: Interactive Lead Placement Lab — the payoff ──────────────── */}
+      {active === '1E' && (
+        <Section label="1E" title="Interactive: place electrodes and see the projection in real time">
+          <Callout accent="#818cf8">
+            <strong className="text-white">This is the conceptual payoff of sections 1A–1D.</strong>{' '}
+            Drag the electrodes anywhere on the body. Watch the ECG strip respond to the dot product
+            between the rotating cardiac dipole and your lead axis. Try placing your lead parallel to
+            Lead II — you'll get the biggest QRS. Rotate 90° — the line goes flat. The physics is
+            identical to projecting vector A onto vector B in section 1D.
+          </Callout>
+
+          <LeadPlacementLab />
+
+          <div className="mt-2 rounded-lg bg-gray-900/70 border border-gray-800 p-2.5">
+            <p className="text-[10px] uppercase tracking-widest text-gray-600 mb-1.5">Guided experiments</p>
+            <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
+              {[
+                { n: '1', text: 'Place electrodes horizontally (left−right). This approximates Lead I (0°). Notice the P wave and T wave are positive, QRS tallest.' },
+                { n: '2', text: 'Rotate to approximately 60° (upper-left to lower-right). This is Lead II — the axis closest to the mean cardiac vector. Maximum QRS amplitude.' },
+                { n: '3', text: 'Place the axis perpendicular to Lead II (~−30°, upper-right to lower-left). The ECG approaches a flat line — pure isoelectric.' },
+                { n: '4', text: 'Flip the electrodes (swap + and −). The waveform inverts. Same axis, opposite polarity — amplitude unchanged, sign flipped.' },
+              ].map(({ n, text }) => (
+                <div key={n} className="flex gap-2">
+                  <span className="shrink-0 w-4 h-4 rounded-full bg-teal-950/60 border border-teal-800/50 text-teal-400 text-[10px] font-bold flex items-center justify-center">{n}</span>
+                  <p className="leading-snug">{text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Section>
+      )}
     </ModulePage>
   )
 }

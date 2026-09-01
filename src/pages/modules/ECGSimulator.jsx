@@ -346,16 +346,16 @@ export default function ECGSimulator() {
       description="Adjust the physiological properties of each structure below. Watch what happens to the EKG. The rhythm name will appear only after you produce it."
       wide
     >
-      <div className="flex gap-4 items-start">
+      <div className="space-y-2">
 
-        {/* ══ LEFT COLUMN: waveform + interpretation ═══════════════════════
-             Sticky — stays in view while the (much longer) parameter column
-             scrolls, so the EKG/heart animation is always visible while
-             adjusting a slider, however far down the panel it is. */}
-        <div className="flex-[1.15] min-w-0 space-y-2 sticky top-4 self-start">
+        {/* ══ TOP ROW: waveform | measurements + interpretation ═════════════
+             Compact horizontal strip instead of a tall side column — leaves
+             the rest of the page for a dense multi-column parameter layout
+             below, so nothing depends on sticky positioning to stay visible. */}
+        <div className="flex gap-2.5 items-stretch">
 
           {/* ── ECG strip + conduction animation ───────────────────────── */}
-          <div className="rounded-xl bg-gray-950 border border-gray-800 p-2.5">
+          <div className="flex-[1.3] min-w-0 rounded-xl bg-gray-950 border border-gray-800 p-2.5">
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-600 uppercase tracking-widest">Lead</span>
@@ -389,8 +389,8 @@ export default function ECGSimulator() {
                 rhythmId={rhythmId}
                 rhythm={physRhythm}
                 className="shrink-0"
-                width={170}
-                height={200}
+                width={150}
+                height={176}
               />
               <div className="flex-1 min-w-0">
                 <canvas ref={canvasRef} width={CW} height={CH} className="w-full rounded-lg"
@@ -400,336 +400,354 @@ export default function ECGSimulator() {
             </div>
           </div>
 
-          {/* ── Current EKG measurements — a READOUT, not a control ─────── */}
-          <div className="rounded-xl bg-gray-900/70 border border-gray-800 p-2.5">
-            <p className="text-xs uppercase tracking-widest text-gray-600 mb-2">Current EKG Measurements</p>
-            <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs font-mono">
-              <span className="text-gray-500">PR <span className="font-bold tabular-nums" style={{ color: prColor }}>{derived.prIntervalMs ? `${Math.round(derived.prIntervalMs)}ms` : '—'}</span></span>
-              <span className="text-gray-500">QRS <span className="font-bold tabular-nums" style={{ color: qrsColor }}>{derived.qrsDurationMs ? `${Math.round(derived.qrsDurationMs)}ms` : '—'}</span></span>
-              <span className="text-gray-500">QT <span className="font-bold tabular-nums text-gray-300">{derived.qtIntervalMs ? `${Math.round(derived.qtIntervalMs)}ms` : '—'}</span></span>
-              <span className="text-gray-500">QTc <span className="font-bold tabular-nums" style={{ color: qtcColor }}>{qtcMs ? `${qtcMs}ms` : '—'}</span></span>
-              <span className="text-gray-500">Axis <span className="font-bold tabular-nums text-gray-300">{axis.angleDeg >= 0 ? '+' : ''}{axis.angleDeg.toFixed(0)}°</span></span>
+          {/* ── Measurements + interpretation, stacked beside the strip ─── */}
+          <div className="flex-1 min-w-0 flex flex-col gap-2">
+            {/* Current EKG measurements — a READOUT, not a control */}
+            <div className="rounded-xl bg-gray-900/70 border border-gray-800 p-2.5">
+              <p className="text-xs uppercase tracking-widest text-gray-600 mb-1.5">Current EKG Measurements</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-mono">
+                <span className="text-gray-500">PR <span className="font-bold tabular-nums" style={{ color: prColor }}>{derived.prIntervalMs ? `${Math.round(derived.prIntervalMs)}ms` : '—'}</span></span>
+                <span className="text-gray-500">QRS <span className="font-bold tabular-nums" style={{ color: qrsColor }}>{derived.qrsDurationMs ? `${Math.round(derived.qrsDurationMs)}ms` : '—'}</span></span>
+                <span className="text-gray-500">QT <span className="font-bold tabular-nums text-gray-300">{derived.qtIntervalMs ? `${Math.round(derived.qtIntervalMs)}ms` : '—'}</span></span>
+                <span className="text-gray-500">QTc <span className="font-bold tabular-nums" style={{ color: qtcColor }}>{qtcMs ? `${qtcMs}ms` : '—'}</span></span>
+                <span className="text-gray-500">Axis <span className="font-bold tabular-nums text-gray-300">{axis.angleDeg >= 0 ? '+' : ''}{axis.angleDeg.toFixed(0)}°</span></span>
+              </div>
             </div>
-          </div>
 
-          {/* ── Physiological interpretation banner ──────────────────────
-               Mechanism first, always. Clinical name only appears below it,
-               smaller — this is the one place the rhythm name shows at all. */}
-          <div
-            key={interp.clinicalName ?? interp.mechanismText}
-            className="rounded-xl p-3 border animate-[pulse_0.6s_ease-out_1]"
-            style={{ backgroundColor: bannerColor + '14', borderColor: bannerColor + '40' }}
-          >
-            <div className="flex items-start gap-2.5">
-              <NoteChip level={interp.level} />
-              <div className="min-w-0">
-                <p className="text-sm text-gray-200 leading-relaxed">{interp.mechanismText}</p>
-                {interp.clinicalName && (
-                  <p className="text-xs font-semibold mt-1.5" style={{ color: bannerColor }}>
-                    → This produces: {interp.clinicalName}
-                  </p>
-                )}
+            {/* Physiological interpretation banner — mechanism first, always.
+                Clinical name only appears below it, smaller — the one place
+                the rhythm name shows at all. */}
+            <div
+              key={interp.clinicalName ?? interp.mechanismText}
+              className="flex-1 rounded-xl p-2.5 border animate-[pulse_0.6s_ease-out_1]"
+              style={{ backgroundColor: bannerColor + '14', borderColor: bannerColor + '40' }}
+            >
+              <div className="flex items-start gap-2">
+                <NoteChip level={interp.level} />
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-200 leading-relaxed">{interp.mechanismText}</p>
+                  {interp.clinicalName && (
+                    <p className="text-xs font-semibold mt-1" style={{ color: bannerColor }}>
+                      → This produces: {interp.clinicalName}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
         </div>
 
-        {/* ══ RIGHT COLUMN: mean axis + physiology sections ════════════════ */}
-        <div className="flex-1 min-w-0 space-y-2">
+        {/* ══ MASONRY: mean axis + 7 physiology sections across 2 independent-
+             height columns (not a CSS grid — each column just stacks its own
+             content, so a tall section in one column doesn't force blank
+             space into the other). Split roughly by content weight so both
+             columns finish around the same point. ══════════════════════ */}
+        <div className="flex gap-3 items-start">
 
-          {/* ── Mean cardiac axis — a readout, no manual override ────────── */}
-          <div className="rounded-xl bg-gray-950 border border-gray-800 p-2.5">
-            <p className="text-xs uppercase tracking-widest text-gray-600 mb-2">Mean Cardiac Axis</p>
-            <div className="flex gap-4 items-start flex-wrap">
-              <div className="shrink-0 mx-auto">
-                <EinthovenAxisTriangle angleDeg={axis.angleDeg} size={140} />
-              </div>
-              <div className="flex-1 min-w-[220px]">
-                <AxisSummaryPanel angleDeg={axis.angleDeg} leadIMm={axis.leadIMm} leadAVFMm={axis.leadAVFMm} />
-              </div>
-            </div>
-          </div>
+          {/* ── Column A: Mean Axis, SA Node, Atrial Myocardium, Autonomic,
+               Ion Concentrations ─────────────────────────────────────────── */}
+          <div className="flex-1 min-w-0 space-y-2">
 
-          {/* ── SECTION 1: SA Node ────────────────────────────────────────── */}
-          <div className="rounded-xl bg-gray-900 border border-gray-800 p-2.5">
-            <SectionHeader
-              title="SA Node — Intrinsic Pacemaker"
-              description="The SA node fires spontaneously due to the funny current (If) and ICa-L. Its rate sets the baseline heart rate when conduction is intact."
-            />
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-              <ParamSlider
-                label="SA Node Automaticity (bpm)"
-                value={saAutomaticity} min={20} max={200} unit=" bpm"
-                onChange={v => set('saAutomaticity', v)}
-                hint="Controlled by the slope of phase 4 spontaneous depolarization. Sympathetic tone steepens the slope (faster). Vagal tone flattens it (slower)."
-              />
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">Firing Regularity</label>
-                <SegBtn value={firingRegularity} onChange={v => set('firingRegularity', v)} options={[
-                  { label: 'Regular',     value: 'regular'     },
-                  { label: 'Respiratory', value: 'respiratory' },
-                  { label: 'Irregular',   value: 'irregular'   },
-                ]} />
-                <p className="text-xs text-gray-600 mt-0.5 leading-snug">
-                  {firingRegularity === 'regular'     && 'Constant P-P interval.'}
-                  {firingRegularity === 'respiratory' && 'Normal variant. Vagal tone increases on expiration, slowing the SA node. Common in young, healthy individuals and athletes — not a pathological finding.'}
-                  {firingRegularity === 'irregular'   && 'SA node dysfunction — sick sinus syndrome. Rate becomes unpredictable.'}
-                </p>
+            {/* Mean cardiac axis — a readout, no manual override */}
+            <div className="rounded-xl bg-gray-950 border border-gray-800 p-2.5">
+              <p className="text-xs uppercase tracking-widest text-gray-600 mb-2">Mean Cardiac Axis</p>
+              <div className="flex gap-4 items-start flex-wrap">
+                <div className="shrink-0 mx-auto">
+                  <EinthovenAxisTriangle angleDeg={axis.angleDeg} size={120} />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <AxisSummaryPanel angleDeg={axis.angleDeg} leadIMm={axis.leadIMm} leadAVFMm={axis.leadAVFMm} />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* ── SECTION 2: Atrial Myocardium ──────────────────────────────── */}
-          <div className="rounded-xl bg-gray-900 border border-gray-800 p-2.5">
-            <SectionHeader
-              title="Atrial Myocardium — Conduction & Refractoriness"
-              description="Once the SA node fires, depolarization spreads through the atria. How fast it conducts and how quickly it recovers determines whether organized or chaotic atrial activity occurs."
-            />
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-              <ParamSlider
-                label="Atrial Conduction Velocity"
-                value={atrialConductionVelocityPct} min={20} max={100} unit="%"
-                onChange={v => set('atrialConductionVelocityPct', v)}
-                hint="Normal: ~1 m/s across the atrial wall. Slowing widens the P wave. Bachmann's bundle carries the impulse from right to left atrium."
+            {/* SECTION 1: SA Node */}
+            <div className="rounded-xl bg-gray-900 border border-gray-800 p-2.5">
+              <SectionHeader
+                title="SA Node — Intrinsic Pacemaker"
+                description="The SA node fires spontaneously due to the funny current (If) and ICa-L. Its rate sets the baseline heart rate when conduction is intact."
               />
-              <ParamSlider
-                label="Atrial Refractory Period (ms)"
-                value={atrialRefractoryMs} min={150} max={350} unit=" ms"
-                color={atrialRefractoryMs < 200 ? '#ef4444' : atrialRefractoryMs < 250 ? '#f59e0b' : '#10b981'}
-                onChange={v => set('atrialRefractoryMs', v)}
-                hint={
-                  atrialRefractoryMs < 180
-                    ? 'Multiple re-entrant wavelets — organized atrial contraction is lost.'
-                    : atrialRefractoryMs < 200
-                    ? 'Re-entry established — a single circuit is sustaining itself. The atria are contracting 4× faster than normal.'
-                    : atrialRefractoryMs < 250
-                    ? 'Atrial conduction is becoming slightly erratic — P wave morphology varies.'
-                    : 'How long atrial cells cannot be re-excited after firing. If the refractory period becomes shorter than the wavelength of a re-entrant impulse, organized conduction breaks down into multiple simultaneous wavelets.'
-                }
-              />
-            </div>
-          </div>
-
-          {/* ── SECTION 3: AV Node ────────────────────────────────────────── */}
-          <div className="rounded-xl bg-gray-900 border border-gray-800 p-2.5">
-            <SectionHeader
-              title="AV Node — Gatekeeper"
-              description="The AV node is the only normal electrical connection between atria and ventricles. Its slow conduction velocity (0.05 m/s — 40× slower than Purkinje) creates the PR delay that allows atrial contraction to fill the ventricles before they contract."
-            />
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-              <ParamSlider
-                label="AV Node Conduction Velocity"
-                value={avConductionVelocityPct} min={0} max={100} unit="%"
-                onChange={v => set('avConductionVelocityPct', v)}
-                hint={
-                  avConductionVelocityPct === 0
-                    ? 'Complete AV block. No atrial impulse reaches the ventricles. The ventricles are now depending entirely on their own backup pacemakers.'
-                    : avConductionVelocityPct <= 20
-                    ? 'The AV node can no longer conduct every impulse. Some atrial beats are blocked — you will see P waves with no following QRS.'
-                    : avConductionVelocityPct <= 40
-                    ? 'AV node struggles with rapid impulses — some fail to conduct, especially when atrial rate is fast.'
-                    : avConductionVelocityPct <= 70
-                    ? 'Conduction is slowed but intact. Every atrial impulse still reaches the ventricles — just later.'
-                    : 'Normal: ~0.05 m/s. The slowest conduction in the heart — this is why the PR interval exists.'
-                }
-              />
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">AV Node Recovery Pattern</label>
-                <SegBtn value={avRecoveryBehavior} onChange={v => set('avRecoveryBehavior', v)} options={[
-                  { label: 'Uniform', value: 'uniform' },
-                  { label: 'Fatigue', value: 'fatigue' },
-                ]} />
-                <p className="text-xs text-gray-600 mt-0.5 leading-snug">
-                  {avRecoveryBehavior === 'fatigue'
-                    ? "With each impulse, the AV node takes slightly longer to recover. This produces progressively longer PR intervals until a beat is finally blocked — then the node resets. This is the mechanism of Wenckebach."
-                    : "The AV node either conducts or it doesn't — recovery time is constant. When a beat is blocked, there is no warning. This is the mechanism of Mobitz II."}
-                </p>
-              </div>
-              <div className="col-span-2">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                 <ParamSlider
-                  label="AV Node Refractory Period (ms)"
-                  value={avRefractoryMs} min={200} max={500} unit=" ms"
-                  disabled={isBlock}
-                  onChange={v => set('avRefractoryMs', v)}
-                  hint="Determines the maximum atrial rate the AV node will conduct. At flutter rates (~300 bpm), the refractory period determines how many impulses get through (2:1, 3:1, 4:1). You don't set the ratio directly — it emerges from the refractory period and the atrial rate."
+                  label="SA Node Automaticity (bpm)"
+                  value={saAutomaticity} min={20} max={200} unit=" bpm"
+                  onChange={v => set('saAutomaticity', v)}
+                  hint="Controlled by the slope of phase 4 spontaneous depolarization. Sympathetic tone steepens the slope (faster). Vagal tone flattens it (slower)."
                 />
-                {!isBlock && (
-                  <div className="mt-2 rounded-lg bg-gray-900/70 border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-gray-400 leading-relaxed">
-                    Atrial rate: <span className="text-gray-200">{atrialRateForCalc} bpm</span> → interval: <span className="text-gray-200">{Math.round(atrialIntervalForCalc)}ms</span>
-                    <br />AV refractory period: <span className="text-gray-200">{Math.round(effectiveRefractoryForCalc)}ms</span>
-                    {' → '}<span className="font-bold" style={{ color: EMERALD }}>{derived.avRatio}:{Math.max(1, derived.avRatio - 1)} conduction</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ── SECTION 4: His-Purkinje System ────────────────────────────── */}
-          <div className="rounded-xl bg-gray-900 border border-gray-800 p-2.5">
-            <SectionHeader
-              title="His-Purkinje System — Fast Conduction Network"
-              description="Conducts at 2-4 m/s — 40-80× faster than the AV node. Ensures both ventricles activate nearly simultaneously, producing a narrow QRS. When a bundle branch fails, the affected ventricle must be activated slowly through muscle — widening the QRS."
-            />
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-              <ParamSlider
-                label="Left Bundle Branch Velocity"
-                value={leftBundleVelocityPct} min={0} max={100} unit="%"
-                onChange={v => set('leftBundleVelocityPct', v)}
-                hint={
-                  leftBundleVelocityPct < 30
-                    ? "Left bundle branch conduction has failed. The left ventricle is now activated late, through slow muscle-to-muscle spread rather than fast Purkinje conduction. Watch the QRS widen above 120ms."
-                    : leftBundleVelocityPct < 60
-                    ? 'Incomplete LBBB — QRS 100-120ms, subtle morphology change.'
-                    : "Carries the impulse to the left ventricle and left side of the septum. Supplies the left anterior and posterior fascicles."
-                }
-              />
-              <ParamSlider
-                label="Right Bundle Branch Velocity"
-                value={rightBundleVelocityPct} min={0} max={100} unit="%"
-                onChange={v => set('rightBundleVelocityPct', v)}
-                hint={
-                  rightBundleVelocityPct < 30
-                    ? "Right bundle branch conduction has failed. The right ventricle activates late. QRS widens, with a characteristic late rightward deflection (the 'rabbit ear')."
-                    : rightBundleVelocityPct < 60
-                    ? 'Incomplete RBBB — QRS 100-120ms, subtle morphology change.'
-                    : 'Carries depolarization to the right ventricular myocardium and interventricular septum.'
-                }
-              />
-              <div className="col-span-2">
-                <ParamSlider
-                  label="Purkinje Ectopic Automaticity (bpm)"
-                  value={purkinjeAutomaticity} min={0} max={50} unit=" bpm"
-                  onChange={v => set('purkinjeAutomaticity', v)}
-                  hint="Purkinje cells have intrinsic automaticity at 20-40 bpm but are normally suppressed by the faster SA node (overdrive suppression). This slider controls what happens when SA node suppression is removed or AV conduction fails."
-                />
-                {purkinjeAutomaticity > 0 && (
-                  <p className="text-xs mt-1.5 leading-snug" style={{ color: derived.escapeSource === 'purkinje' ? '#f59e0b' : '#6b7280' }}>
-                    {derived.escapeSource === 'purkinje'
-                      ? "The SA node's impulses are blocked at the AV node. The Purkinje system is now acting as an escape pacemaker — without it, the ventricles would not contract at all."
-                      : `SA rate (${Math.round(derived.effectiveSaRate)} bpm) > Purkinje rate — SA node is suppressing this backup pacemaker through overdrive suppression. Try slowing the SA node below the Purkinje rate to see the escape rhythm emerge.`}
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Firing Regularity</label>
+                  <SegBtn value={firingRegularity} onChange={v => set('firingRegularity', v)} options={[
+                    { label: 'Regular',     value: 'regular'     },
+                    { label: 'Respiratory', value: 'respiratory' },
+                    { label: 'Irregular',   value: 'irregular'   },
+                  ]} />
+                  <p className="text-xs text-gray-600 mt-0.5 leading-snug">
+                    {firingRegularity === 'regular'     && 'Constant P-P interval.'}
+                    {firingRegularity === 'respiratory' && 'Normal variant. Vagal tone increases on expiration, slowing the SA node. Common in young, healthy individuals and athletes — not a pathological finding.'}
+                    {firingRegularity === 'irregular'   && 'SA node dysfunction — sick sinus syndrome. Rate becomes unpredictable.'}
                   </p>
-                )}
+                </div>
               </div>
             </div>
+
+            {/* SECTION 2: Atrial Myocardium */}
+            <div className="rounded-xl bg-gray-900 border border-gray-800 p-2.5">
+              <SectionHeader
+                title="Atrial Myocardium — Conduction & Refractoriness"
+                description="Once the SA node fires, depolarization spreads through the atria. How fast it conducts and how quickly it recovers determines whether organized or chaotic atrial activity occurs."
+              />
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                <ParamSlider
+                  label="Atrial Conduction Velocity"
+                  value={atrialConductionVelocityPct} min={20} max={100} unit="%"
+                  onChange={v => set('atrialConductionVelocityPct', v)}
+                  hint="Normal: ~1 m/s across the atrial wall. Slowing widens the P wave. Bachmann's bundle carries the impulse from right to left atrium."
+                />
+                <ParamSlider
+                  label="Atrial Refractory Period (ms)"
+                  value={atrialRefractoryMs} min={150} max={350} unit=" ms"
+                  color={atrialRefractoryMs < 200 ? '#ef4444' : atrialRefractoryMs < 250 ? '#f59e0b' : '#10b981'}
+                  onChange={v => set('atrialRefractoryMs', v)}
+                  hint={
+                    atrialRefractoryMs < 180
+                      ? 'Multiple re-entrant wavelets — organized atrial contraction is lost.'
+                      : atrialRefractoryMs < 200
+                      ? 'Re-entry established — a single circuit is sustaining itself. The atria are contracting 4× faster than normal.'
+                      : atrialRefractoryMs < 250
+                      ? 'Atrial conduction is becoming slightly erratic — P wave morphology varies.'
+                      : 'How long atrial cells cannot be re-excited after firing. If the refractory period becomes shorter than the wavelength of a re-entrant impulse, organized conduction breaks down into multiple simultaneous wavelets.'
+                  }
+                />
+              </div>
+            </div>
+
+            {/* SECTION 6: Autonomic Nervous System (collapsed) */}
+            <CollapsibleSection
+              title="Autonomic Nervous System"
+              description="The autonomic nervous system modulates all the parameters above simultaneously. Rather than changing individual properties, autonomic tone shifts the entire system."
+            >
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                <div>
+                  <ParamSlider
+                    label="Sympathetic (Adrenergic) Tone"
+                    value={sympatheticTone} min={0} max={100} unit="%"
+                    onChange={v => set('sympatheticTone', v)}
+                    hint="Noradrenaline/adrenaline acts on β1 receptors. Increases If (steeper phase 4 slope in SA node), enhances ICa-L (faster AV conduction), shortens action potential duration (shorter QT)."
+                  />
+                  <p className="text-xs text-gray-600 mt-1">↑ SA automaticity | ↓ AV conduction delay | ↓ AP duration</p>
+                  <p className="text-xs text-gray-700 mt-0.5">Exercise, fear, pain, epinephrine, dopamine, dobutamine</p>
+                </div>
+                <div>
+                  <ParamSlider
+                    label="Parasympathetic (Cholinergic) Tone"
+                    value={parasympatheticTone} min={0} max={100} unit="%"
+                    onChange={v => set('parasympatheticTone', v)}
+                    hint="Acetylcholine acts on M2 receptors. Opens IKAch channels — hyperpolarizes SA node (slower automaticity) and slows AV node conduction (longer PR)."
+                  />
+                  <p className="text-xs text-gray-600 mt-1">↓ SA automaticity | ↑ AV conduction delay | variable AP duration</p>
+                  <p className="text-xs text-gray-700 mt-0.5">Sleep, vasovagal syncope, digoxin, athletic training, carotid sinus massage</p>
+                </div>
+              </div>
+            </CollapsibleSection>
+
+            {/* SECTION 7: Ion Concentrations — Advanced (collapsed) */}
+            <CollapsibleSection
+              title="Ion Concentrations — Advanced"
+              description="The resting membrane potential and action potential shape depend on the electrochemical gradients for Na+, K+, and Ca2+. Changing extracellular concentrations shifts these gradients and alters every electrical property above."
+            >
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                <div>
+                  <ParamSlider
+                    label="Extracellular [K+] (mEq/L)"
+                    value={potassiumMEqL} min={2.0} max={9.0} step={0.1} unit=" mEq/L"
+                    color={potassiumMEqL > 7 || potassiumMEqL < 2.5 ? '#ef4444' : (potassiumMEqL > 5.5 || potassiumMEqL < 3.5) ? '#f59e0b' : '#10b981'}
+                    onChange={v => set('potassiumMEqL', v)}
+                    hint="K+ gradient determines resting membrane potential (Nernst equation). Low K+ hyperpolarizes cells and prolongs action potentials. High K+ depolarizes cells and slows conduction globally."
+                  />
+                  {derived.ionAlert && (
+                    <p className="text-xs mt-1.5 leading-snug" style={{ color: derived.hyperkalemiaAlert ? '#ef4444' : '#f59e0b' }}>
+                      {derived.hyperkalemiaAlert && '⚠ Critical hyperkalemia. '}{derived.ionAlert}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <ParamSlider
+                    label="Extracellular [Ca2+] (mg/dL)"
+                    value={calciumMgDl} min={5.0} max={15.0} step={0.1} unit=" mg/dL"
+                    color={calciumMgDl > 13 || calciumMgDl < 7 ? '#ef4444' : (calciumMgDl > 10.5 || calciumMgDl < 8.5) ? '#f59e0b' : '#10b981'}
+                    onChange={v => set('calciumMgDl', v)}
+                    hint="Ca2+ affects the threshold for action potential firing and the plateau phase duration via ICa-L. It does NOT change resting membrane potential significantly."
+                  />
+                  <p className="text-xs text-gray-600 mt-1.5 leading-snug">
+                    {calciumMgDl > 13
+                      ? 'Severe hypercalcemia — abnormal notch at the J point (Osborn wave), also seen in hypothermia.'
+                      : calciumMgDl > 10.5
+                      ? 'Enhanced ICa-L terminates the plateau more quickly — QT shortens.'
+                      : calciumMgDl < 8.5
+                      ? 'ST segment lengthens because ICa-L is reduced — the plateau phase takes longer to terminate. Predisposes to Torsades.'
+                      : 'Normal range: 8.5-10.5 mg/dL.'}
+                  </p>
+                </div>
+              </div>
+            </CollapsibleSection>
+
           </div>
 
-          {/* ── SECTION 5: Ventricular Myocardium ─────────────────────────── */}
-          <div className="rounded-xl bg-gray-900 border border-gray-800 p-2.5">
-            <SectionHeader
-              title="Ventricular Myocardium — Contraction & Repolarization"
-              description="The working muscle of the heart. Its action potential duration determines the QT interval and the vulnerable period for re-entry. Ectopic automaticity here produces wide, bizarre beats originating outside the normal conduction system."
-            />
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-              <div>
+          {/* ── Column B: AV Node, His-Purkinje, Ventricular Myocardium ──── */}
+          <div className="flex-1 min-w-0 space-y-2">
+
+            {/* SECTION 3: AV Node */}
+            <div className="rounded-xl bg-gray-900 border border-gray-800 p-2.5">
+              <SectionHeader
+                title="AV Node — Gatekeeper"
+                description="The AV node is the only normal electrical connection between atria and ventricles. Its slow conduction velocity (0.05 m/s — 40× slower than Purkinje) creates the PR delay that allows atrial contraction to fill the ventricles before they contract."
+              />
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                 <ParamSlider
-                  label="Ventricular Action Potential Duration (ms)"
-                  value={ventricularApdMs} min={200} max={500} unit=" ms"
-                  onChange={v => set('ventricularApdMs', v)}
-                  hint="Determines QT interval. Normally shortens at faster heart rates. When prolonged, the vulnerable period for re-entry widens — increasing the risk of Torsades de Pointes."
+                  label="AV Node Conduction Velocity"
+                  value={avConductionVelocityPct} min={0} max={100} unit="%"
+                  onChange={v => set('avConductionVelocityPct', v)}
+                  hint={
+                    avConductionVelocityPct === 0
+                      ? 'Complete AV block. No atrial impulse reaches the ventricles. The ventricles are now depending entirely on their own backup pacemakers.'
+                      : avConductionVelocityPct <= 20
+                      ? 'The AV node can no longer conduct every impulse. Some atrial beats are blocked — you will see P waves with no following QRS.'
+                      : avConductionVelocityPct <= 40
+                      ? 'AV node struggles with rapid impulses — some fail to conduct, especially when atrial rate is fast.'
+                      : avConductionVelocityPct <= 70
+                      ? 'Conduction is slowed but intact. Every atrial impulse still reaches the ventricles — just later.'
+                      : 'Normal: ~0.05 m/s. The slowest conduction in the heart — this is why the PR interval exists.'
+                  }
                 />
-                <p className="text-xs mt-0.5 leading-snug" style={{ color: qtcColor }}>
-                  {!qtcMs ? '' : qtcMs > 500 ? 'High risk — Torsades threshold approached.' : qtcMs > 440 ? 'Borderline prolonged — vulnerable period widening.' : 'Within normal range.'}
-                </p>
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">Repolarization Heterogeneity</label>
-                <SegBtn value={repolHeterogeneity} onChange={v => set('repolHeterogeneity', v)} options={[
-                  { label: 'None',     value: 'none'     },
-                  { label: 'Moderate', value: 'moderate' },
-                  { label: 'High',     value: 'high'     },
-                ]} />
-                <p className="text-xs text-gray-600 mt-0.5 leading-snug">
-                  {repolHeterogeneity === 'none'     && 'Uniform T wave, low arrhythmia risk.'}
-                  {repolHeterogeneity === 'moderate'  && 'T wave changes, inverted or biphasic.'}
-                  {repolHeterogeneity === 'high'      && 'Heterogeneous repolarization creates a re-entry substrate — some regions are excitable while adjacent regions are still refractory. Re-entrant beats begin appearing.'}
-                </p>
-              </div>
-              <div className="col-span-2">
-                <ParamSlider
-                  label="Ventricular Ectopic Focus Automaticity (bpm)"
-                  value={ventricularEctopicRate} min={0} max={120} unit=" bpm"
-                  onChange={v => set('ventricularEctopicRate', v)}
-                  hint="Ventricular muscle cells do not normally fire spontaneously — they wait for the Purkinje impulse. Ischemia, electrolyte abnormalities, and catecholamine excess can cause spontaneous depolarization in a small region of ventricular muscle, creating an ectopic focus."
-                />
-                {ventricularEctopicRate > 150 && derived.ectopicCapture === 'captured' && (
-                  <p className="text-xs text-red-400 mt-1.5 leading-snug">
-                    Sustained ventricular tachycardia — haemodynamically dangerous. At these rates, ventricular filling is severely compromised.
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">AV Node Recovery Pattern</label>
+                  <SegBtn value={avRecoveryBehavior} onChange={v => set('avRecoveryBehavior', v)} options={[
+                    { label: 'Uniform', value: 'uniform' },
+                    { label: 'Fatigue', value: 'fatigue' },
+                  ]} />
+                  <p className="text-xs text-gray-600 mt-0.5 leading-snug">
+                    {avRecoveryBehavior === 'fatigue'
+                      ? "With each impulse, the AV node takes slightly longer to recover. This produces progressively longer PR intervals until a beat is finally blocked — then the node resets. This is the mechanism of Wenckebach."
+                      : "The AV node either conducts or it doesn't — recovery time is constant. When a beat is blocked, there is no warning. This is the mechanism of Mobitz II."}
                   </p>
-                )}
+                </div>
+                <div className="col-span-2">
+                  <ParamSlider
+                    label="AV Node Refractory Period (ms)"
+                    value={avRefractoryMs} min={200} max={500} unit=" ms"
+                    disabled={isBlock}
+                    onChange={v => set('avRefractoryMs', v)}
+                    hint="Determines the maximum atrial rate the AV node will conduct. At flutter rates (~300 bpm), the refractory period determines how many impulses get through (2:1, 3:1, 4:1). You don't set the ratio directly — it emerges from the refractory period and the atrial rate."
+                  />
+                  {!isBlock && (
+                    <div className="mt-2 rounded-lg bg-gray-900/70 border border-gray-800 px-2.5 py-1.5 text-xs font-mono text-gray-400 leading-relaxed">
+                      Atrial rate: <span className="text-gray-200">{atrialRateForCalc} bpm</span> → interval: <span className="text-gray-200">{Math.round(atrialIntervalForCalc)}ms</span>
+                      <br />AV refractory period: <span className="text-gray-200">{Math.round(effectiveRefractoryForCalc)}ms</span>
+                      {' → '}<span className="font-bold" style={{ color: EMERALD }}>{derived.avRatio}:{Math.max(1, derived.avRatio - 1)} conduction</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* SECTION 4: His-Purkinje System */}
+            <div className="rounded-xl bg-gray-900 border border-gray-800 p-2.5">
+              <SectionHeader
+                title="His-Purkinje System — Fast Conduction Network"
+                description="Conducts at 2-4 m/s — 40-80× faster than the AV node. Ensures both ventricles activate nearly simultaneously, producing a narrow QRS. When a bundle branch fails, the affected ventricle must be activated slowly through muscle — widening the QRS."
+              />
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                <ParamSlider
+                  label="Left Bundle Branch Velocity"
+                  value={leftBundleVelocityPct} min={0} max={100} unit="%"
+                  onChange={v => set('leftBundleVelocityPct', v)}
+                  hint={
+                    leftBundleVelocityPct < 30
+                      ? "Left bundle branch conduction has failed. The left ventricle is now activated late, through slow muscle-to-muscle spread rather than fast Purkinje conduction. Watch the QRS widen above 120ms."
+                      : leftBundleVelocityPct < 60
+                      ? 'Incomplete LBBB — QRS 100-120ms, subtle morphology change.'
+                      : "Carries the impulse to the left ventricle and left side of the septum. Supplies the left anterior and posterior fascicles."
+                  }
+                />
+                <ParamSlider
+                  label="Right Bundle Branch Velocity"
+                  value={rightBundleVelocityPct} min={0} max={100} unit="%"
+                  onChange={v => set('rightBundleVelocityPct', v)}
+                  hint={
+                    rightBundleVelocityPct < 30
+                      ? "Right bundle branch conduction has failed. The right ventricle activates late. QRS widens, with a characteristic late rightward deflection (the 'rabbit ear')."
+                      : rightBundleVelocityPct < 60
+                      ? 'Incomplete RBBB — QRS 100-120ms, subtle morphology change.'
+                      : 'Carries depolarization to the right ventricular myocardium and interventricular septum.'
+                  }
+                />
+                <div className="col-span-2">
+                  <ParamSlider
+                    label="Purkinje Ectopic Automaticity (bpm)"
+                    value={purkinjeAutomaticity} min={0} max={50} unit=" bpm"
+                    onChange={v => set('purkinjeAutomaticity', v)}
+                    hint="Purkinje cells have intrinsic automaticity at 20-40 bpm but are normally suppressed by the faster SA node (overdrive suppression). This slider controls what happens when SA node suppression is removed or AV conduction fails."
+                  />
+                  {purkinjeAutomaticity > 0 && (
+                    <p className="text-xs mt-1.5 leading-snug" style={{ color: derived.escapeSource === 'purkinje' ? '#f59e0b' : '#6b7280' }}>
+                      {derived.escapeSource === 'purkinje'
+                        ? "The SA node's impulses are blocked at the AV node. The Purkinje system is now acting as an escape pacemaker — without it, the ventricles would not contract at all."
+                        : `SA rate (${Math.round(derived.effectiveSaRate)} bpm) > Purkinje rate — SA node is suppressing this backup pacemaker through overdrive suppression. Try slowing the SA node below the Purkinje rate to see the escape rhythm emerge.`}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 5: Ventricular Myocardium */}
+            <div className="rounded-xl bg-gray-900 border border-gray-800 p-2.5">
+              <SectionHeader
+                title="Ventricular Myocardium — Contraction & Repolarization"
+                description="The working muscle of the heart. Its action potential duration determines the QT interval and the vulnerable period for re-entry. Ectopic automaticity here produces wide, bizarre beats originating outside the normal conduction system."
+              />
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                <div>
+                  <ParamSlider
+                    label="Ventricular Action Potential Duration (ms)"
+                    value={ventricularApdMs} min={200} max={500} unit=" ms"
+                    onChange={v => set('ventricularApdMs', v)}
+                    hint="Determines QT interval. Normally shortens at faster heart rates. When prolonged, the vulnerable period for re-entry widens — increasing the risk of Torsades de Pointes."
+                  />
+                  <p className="text-xs mt-0.5 leading-snug" style={{ color: qtcColor }}>
+                    {!qtcMs ? '' : qtcMs > 500 ? 'High risk — Torsades threshold approached.' : qtcMs > 440 ? 'Borderline prolonged — vulnerable period widening.' : 'Within normal range.'}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Repolarization Heterogeneity</label>
+                  <SegBtn value={repolHeterogeneity} onChange={v => set('repolHeterogeneity', v)} options={[
+                    { label: 'None',     value: 'none'     },
+                    { label: 'Moderate', value: 'moderate' },
+                    { label: 'High',     value: 'high'     },
+                  ]} />
+                  <p className="text-xs text-gray-600 mt-0.5 leading-snug">
+                    {repolHeterogeneity === 'none'     && 'Uniform T wave, low arrhythmia risk.'}
+                    {repolHeterogeneity === 'moderate'  && 'T wave changes, inverted or biphasic.'}
+                    {repolHeterogeneity === 'high'      && 'Heterogeneous repolarization creates a re-entry substrate — some regions are excitable while adjacent regions are still refractory. Re-entrant beats begin appearing.'}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <ParamSlider
+                    label="Ventricular Ectopic Focus Automaticity (bpm)"
+                    value={ventricularEctopicRate} min={0} max={120} unit=" bpm"
+                    onChange={v => set('ventricularEctopicRate', v)}
+                    hint="Ventricular muscle cells do not normally fire spontaneously — they wait for the Purkinje impulse. Ischemia, electrolyte abnormalities, and catecholamine excess can cause spontaneous depolarization in a small region of ventricular muscle, creating an ectopic focus."
+                  />
+                  {ventricularEctopicRate > 150 && derived.ectopicCapture === 'captured' && (
+                    <p className="text-xs text-red-400 mt-1.5 leading-snug">
+                      Sustained ventricular tachycardia — haemodynamically dangerous. At these rates, ventricular filling is severely compromised.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
           </div>
-
-          {/* ── SECTION 6: Autonomic Nervous System (collapsed) ───────────── */}
-          <CollapsibleSection
-            title="Autonomic Nervous System"
-            description="The autonomic nervous system modulates all the parameters above simultaneously. Rather than changing individual properties, autonomic tone shifts the entire system."
-          >
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-              <div>
-                <ParamSlider
-                  label="Sympathetic (Adrenergic) Tone"
-                  value={sympatheticTone} min={0} max={100} unit="%"
-                  onChange={v => set('sympatheticTone', v)}
-                  hint="Noradrenaline/adrenaline acts on β1 receptors. Increases If (steeper phase 4 slope in SA node), enhances ICa-L (faster AV conduction), shortens action potential duration (shorter QT)."
-                />
-                <p className="text-xs text-gray-600 mt-1">↑ SA automaticity | ↓ AV conduction delay | ↓ AP duration</p>
-                <p className="text-xs text-gray-700 mt-0.5">Exercise, fear, pain, epinephrine, dopamine, dobutamine</p>
-              </div>
-              <div>
-                <ParamSlider
-                  label="Parasympathetic (Cholinergic) Tone"
-                  value={parasympatheticTone} min={0} max={100} unit="%"
-                  onChange={v => set('parasympatheticTone', v)}
-                  hint="Acetylcholine acts on M2 receptors. Opens IKAch channels — hyperpolarizes SA node (slower automaticity) and slows AV node conduction (longer PR)."
-                />
-                <p className="text-xs text-gray-600 mt-1">↓ SA automaticity | ↑ AV conduction delay | variable AP duration</p>
-                <p className="text-xs text-gray-700 mt-0.5">Sleep, vasovagal syncope, digoxin, athletic training, carotid sinus massage</p>
-              </div>
-            </div>
-          </CollapsibleSection>
-
-          {/* ── SECTION 7: Ion Concentrations — Advanced (collapsed) ──────── */}
-          <CollapsibleSection
-            title="Ion Concentrations — Advanced"
-            description="The resting membrane potential and action potential shape depend on the electrochemical gradients for Na+, K+, and Ca2+. Changing extracellular concentrations shifts these gradients and alters every electrical property above."
-          >
-            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-              <div>
-                <ParamSlider
-                  label="Extracellular [K+] (mEq/L)"
-                  value={potassiumMEqL} min={2.0} max={9.0} step={0.1} unit=" mEq/L"
-                  color={potassiumMEqL > 7 || potassiumMEqL < 2.5 ? '#ef4444' : (potassiumMEqL > 5.5 || potassiumMEqL < 3.5) ? '#f59e0b' : '#10b981'}
-                  onChange={v => set('potassiumMEqL', v)}
-                  hint="K+ gradient determines resting membrane potential (Nernst equation). Low K+ hyperpolarizes cells and prolongs action potentials. High K+ depolarizes cells and slows conduction globally."
-                />
-                {derived.ionAlert && (
-                  <p className="text-xs mt-1.5 leading-snug" style={{ color: derived.hyperkalemiaAlert ? '#ef4444' : '#f59e0b' }}>
-                    {derived.hyperkalemiaAlert && '⚠ Critical hyperkalemia. '}{derived.ionAlert}
-                  </p>
-                )}
-              </div>
-              <div>
-                <ParamSlider
-                  label="Extracellular [Ca2+] (mg/dL)"
-                  value={calciumMgDl} min={5.0} max={15.0} step={0.1} unit=" mg/dL"
-                  color={calciumMgDl > 13 || calciumMgDl < 7 ? '#ef4444' : (calciumMgDl > 10.5 || calciumMgDl < 8.5) ? '#f59e0b' : '#10b981'}
-                  onChange={v => set('calciumMgDl', v)}
-                  hint="Ca2+ affects the threshold for action potential firing and the plateau phase duration via ICa-L. It does NOT change resting membrane potential significantly."
-                />
-                <p className="text-xs text-gray-600 mt-1.5 leading-snug">
-                  {calciumMgDl > 13
-                    ? 'Severe hypercalcemia — abnormal notch at the J point (Osborn wave), also seen in hypothermia.'
-                    : calciumMgDl > 10.5
-                    ? 'Enhanced ICa-L terminates the plateau more quickly — QT shortens.'
-                    : calciumMgDl < 8.5
-                    ? 'ST segment lengthens because ICa-L is reduced — the plateau phase takes longer to terminate. Predisposes to Torsades.'
-                    : 'Normal range: 8.5-10.5 mg/dL.'}
-                </p>
-              </div>
-            </div>
-          </CollapsibleSection>
 
         </div>
       </div>

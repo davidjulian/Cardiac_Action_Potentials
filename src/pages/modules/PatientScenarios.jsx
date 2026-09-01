@@ -8,7 +8,9 @@ import {
 } from '../../lib/ECGEngine'
 
 // ── Strip canvas config ───────────────────────────────────────────────────────
-const SW = 820, SH = 150
+// Shortened from the original 820×150 — all grid/trace drawing below is a
+// pure function of the w/h passed in, so this needed no other changes.
+const SW = 760, SH = 115
 const PX_MS = 0.20
 const PX_MV = 60
 const BL = 0.58
@@ -571,7 +573,7 @@ function ECGStrip({ rhythm }) {
 function HPICard({ hpi }) {
   return (
     <div className="rounded-xl border border-gray-700 bg-gray-900/60 overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-700 bg-gray-800/40">
+      <div className="px-3 py-2 border-b border-gray-700 bg-gray-800/40">
         <p className="text-sm font-semibold text-white">
           {hpi.age}{hpi.sex} &mdash; <span className="font-normal text-gray-300">{hpi.complaint}</span>
         </p>
@@ -581,7 +583,7 @@ function HPICard({ hpi }) {
         ['Medications',          hpi.meds],
         ['Vital signs',          hpi.vitals],
       ].map(([label, val]) => (
-        <div key={label} className="px-4 py-2.5 grid gap-4 border-b border-gray-800/80 last:border-0"
+        <div key={label} className="px-3 py-1.5 grid gap-4 border-b border-gray-800/80 last:border-0"
           style={{ gridTemplateColumns: '150px 1fr' }}>
           <span className="text-xs text-gray-500 uppercase tracking-wide leading-5">{label}</span>
           <span className="text-sm text-gray-300 leading-relaxed">{val}</span>
@@ -595,11 +597,11 @@ function HPICard({ hpi }) {
 function HintSequence({ hints }) {
   const [step, setStep] = useState(0)
   return (
-    <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-4">
-      <p className="text-xs text-amber-500/80 uppercase tracking-widest font-semibold mb-3">
+    <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-3">
+      <p className="text-xs text-amber-500/80 uppercase tracking-widest font-semibold mb-2">
         Guided prompts — Case 1 only
       </p>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {hints.slice(0, step + 1).map((hint, i) => (
           <div key={i} className="flex gap-2 items-start">
             <span className="text-amber-500 text-xs mt-0.5 shrink-0">→</span>
@@ -635,8 +637,8 @@ function QuestionBlock({ question, value, onChange, submitted }) {
 
   if (question.type === 'numeric') {
     return (
-      <div className={`rounded-xl border p-4 ${borderBase}`}>
-        <p className="text-sm text-gray-200 mb-3 font-medium">{question.stem}</p>
+      <div className={`rounded-xl border p-3 ${borderBase}`}>
+        <p className="text-sm text-gray-200 mb-2 font-medium">{question.stem}</p>
         <div className="flex items-center gap-3">
           <input
             type="number"
@@ -658,9 +660,9 @@ function QuestionBlock({ question, value, onChange, submitted }) {
   }
 
   return (
-    <div className={`rounded-xl border p-4 ${borderBase}`}>
-      <p className="text-sm text-gray-200 mb-3 font-medium">{question.stem}</p>
-      <div className="space-y-2">
+    <div className={`rounded-xl border p-3 ${borderBase}`}>
+      <p className="text-sm text-gray-200 mb-2 font-medium">{question.stem}</p>
+      <div className="space-y-1.5">
         {question.options.map((opt, i) => {
           const selected = value === i
           const isCorrectOption = i === question.correct
@@ -670,7 +672,7 @@ function QuestionBlock({ question, value, onChange, submitted }) {
           else if (!submitted && selected)             cls = 'border-indigo-500 bg-indigo-900/30 text-indigo-200'
           return (
             <button key={i} onClick={() => !submitted && onChange(i)}
-              className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${cls} ${!submitted ? 'hover:border-gray-500 hover:text-gray-200 cursor-pointer' : 'cursor-default'}`}>
+              className={`w-full text-left px-3 py-1.5 rounded-lg border text-sm transition-colors ${cls} ${!submitted ? 'hover:border-gray-500 hover:text-gray-200 cursor-pointer' : 'cursor-default'}`}>
               <span className="text-gray-500 mr-2 text-xs font-medium">{String.fromCharCode(65 + i)}.</span>
               {opt}
             </button>
@@ -738,26 +740,26 @@ function ScenarioCard({ caseData, onSubmit }) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <HPICard hpi={caseData.hpi} />
 
       <div>
-        <p className="text-xs text-gray-500 uppercase tracking-widest mb-2 font-medium">Lead II — ECG Strip</p>
+        <p className="text-xs text-gray-500 uppercase tracking-widest mb-1 font-medium">Lead II — ECG Strip</p>
         <ECGStrip rhythm={rhythm} />
-        <p className="text-xs text-gray-600 mt-1.5">25 mm/s · 1 cm/mV standard calibration</p>
+        <p className="text-xs text-gray-600 mt-1">25 mm/s · 1 cm/mV standard calibration</p>
       </div>
 
       {caseData.scaffolded && !submitted && (
         <HintSequence hints={caseData.hints} />
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         <p className="text-xs text-gray-500 uppercase tracking-widest font-medium">
           Questions {submitted ? `· ${score}/${caseData.questions.length} correct` : ''}
         </p>
         {caseData.questions.map((q, i) => (
           <div key={q.id}>
-            <p className="text-xs text-gray-600 mb-1.5 font-medium">Question {i + 1}</p>
+            <p className="text-xs text-gray-600 mb-1 font-medium">Question {i + 1}</p>
             <QuestionBlock
               question={q}
               value={answers[q.id]}
@@ -795,8 +797,8 @@ function ProgressDashboard({ scores, onSelectCase, activeId }) {
   }).map(c => c.category)
 
   return (
-    <div className="mb-8 p-4 rounded-2xl border border-gray-800 bg-gray-900/40">
-      <div className="flex items-start gap-8 mb-5">
+    <div className="mb-3 p-3 rounded-xl border border-gray-800 bg-gray-900/40">
+      <div className="flex items-start gap-8 mb-2.5">
         <div>
           <p className="text-2xl font-bold text-white">{completedCount}/{CASES.length}</p>
           <p className="text-xs text-gray-500 mt-0.5">Cases completed</p>
@@ -889,8 +891,6 @@ export default function PatientScenarios() {
       moduleId="scenarios"
       number={4}
       title="Patient Scenarios"
-      objective="Run the full diagnostic chain: ECG pattern → conduction system failure → mechanism → clinical presentation. And back again."
-      description="Six cases — each with a clinical vignette and a live ECG strip. Identify the rhythm, measure key intervals, locate the failure in the conduction system, and explain the physiology. Case 1 is scaffolded with step-by-step prompts. Cases 2–6 offer no hints."
     >
       <ProgressDashboard
         scores={scores}
@@ -898,7 +898,7 @@ export default function PatientScenarios() {
         activeId={activeId}
       />
 
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold text-white">
             {activeCase.title}: {activeCase.category}
