@@ -118,6 +118,11 @@ export default function Sidebar({ isLabMode }) {
                         style={tabActive ? { backgroundColor: accent + '18', color: accent } : undefined}
                       >
                         <span className="flex-1 leading-tight">{tab.label}</span>
+                        {tab.badge && (
+                          <span className="shrink-0 text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-gray-800 text-gray-500 border border-gray-700">
+                            {tab.badge}
+                          </span>
+                        )}
                         {!tabActive && tabVisited && (
                           <span
                             className="w-1.5 h-1.5 rounded-full shrink-0"

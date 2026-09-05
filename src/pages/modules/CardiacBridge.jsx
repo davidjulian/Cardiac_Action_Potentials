@@ -531,9 +531,6 @@ const AP_VMIN = -100, AP_VMAX = 45
 // which is what caused the visible flashing.
 const AP_Y_DOMAIN = [AP_VMIN, AP_VMAX]
 const ECG_Y_DOMAIN = [0, 1.5]
-const AP_PAD = { l: 40, r: 12, t: 24, b: 18 }
-const AP_H = 150
-
 const AP_PHASE_COLORS = {
   p4:    [59,  130, 246, 40],
   p0:    [239, 68,  68,  50],
@@ -545,198 +542,573 @@ const AP_PHASE_COLORS = {
   repol: [168, 85,  247, 40],
 }
 
-// One canvas per cell type — avoids horizontal layout / clipping issues
-function APPanel({ panelKey, title, sub, data, phases, isSelected, onHover }) {
-  const containerRef = useRef()
-  const isSelectedRef = useRef(isSelected)
-  const hoverPhaseRef = useRef(null)
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
+function smooth01(t) { const c = clamp(t, 0, 1); return c * c * (3 - 2 * c) }
 
-  useEffect(() => { isSelectedRef.current = isSelected }, [isSelected])
+// ── Physiology model ────────────────────────────────────────────────────
+// Deliberately simple, monotonic formulas anchored to the exact before/after
+// numbers called out in the teaching spec (e.g. SA max diastolic potential
+// −60→−55 mV at 100% sympathetic tone) rather than a full ionic model — this
+// drives a teaching visualization, not a research simulation.
+const BASE_SA_RATE = 75 // bpm, at the 20%/20% ANS default
 
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-    let inst
-    const rafId = requestAnimationFrame(() => {
-      if (!container.isConnected) return
-      const W = Math.max(container.clientWidth || 0, 260)
-      const dW = W - AP_PAD.l - AP_PAD.r
-      const dH = AP_H - AP_PAD.t - AP_PAD.b
+function computeAPPhysiology({ sympathetic, parasympathetic, kMEqL, caMgDl }) {
+  const symp = sympathetic / 100
+  const para = parasympathetic / 100
+  const kDev  = kMEqL - 4.0   // deviation from normal extracellular K+
+  const caDev = caMgDl - 9.5  // deviation from normal extracellular Ca2+
 
-      const toX = (t) => AP_PAD.l + t * dW
-      const toY = (v) => AP_PAD.t + (AP_VMAX - v) / (AP_VMAX - AP_VMIN) * dH
+  // ── Shared cycle length — the SA node's own rate paces every panel ──
+  let saRate = BASE_SA_RATE * (1 + 0.9 * symp - 0.75 * para)
+  if (kMEqL < 3.5) saRate *= 1 + 0.08 * (3.5 - kMEqL) // paradoxical low-K+ automaticity increase
+  saRate = clamp(saRate, 25, 220)
+  const cycleMs = 60000 / saRate
 
-      const sketch = (p) => {
-        p.setup = () => {
-          const cnv = p.createCanvas(W, AP_H)
-          cnv.elt.style.width = '100%'
-          cnv.elt.style.height = 'auto'
-          cnv.elt.style.display = 'block'
-          // Backing buffer must have enough real pixels for the CSS-stretched
-          // display size (plus device pixel ratio) or the upscale looks blurry.
-          const rectW = cnv.elt.getBoundingClientRect().width || W
-          const density = Math.min(3, Math.max(1, rectW / W) * (window.devicePixelRatio || 1))
-          p.pixelDensity(density)
-          cnv.elt.style.width = '100%'
-          cnv.elt.style.height = 'auto'
-          cnv.elt.style.display = 'block'
-        }
-        p.draw = () => {
-          p.background(17, 24, 39)
+  // ── SA node shape ──
+  const sa = {
+    mdp: clamp(-60 + 5 * symp - 10 * para, -78, -50),
+    phase4Frac: clamp(0.68 - 0.24 * symp + 0.14 * para, 0.34, 0.86),
+    threshold: -40,
+  }
 
-          if (isSelectedRef.current) {
-            p.noFill(); p.stroke(6, 182, 212, 100); p.strokeWeight(2)
-            p.rect(1, 1, W - 2, AP_H - 2)
-          }
+  // ── Ventricular / Purkinje shared K+ / Ca2+ / sympathetic effects ──
+  const restingMv = kDev >= 0
+    ? clamp(-90 + 7 * kDev, -90, -45)
+    : clamp(-90 + 3 * kDev, -100, -90)
+  const upstrokePeak = clamp(30 - 3 * Math.max(0, kDev), 5, 30)
+  const upstrokeSlowFactor = 1 + 0.7 * Math.max(0, kDev) / 5
+  const plateauScale = clamp(1 - 0.021 * caDev, 0.42, 1.9) * (1 - 0.15 * symp)
+  const repolSlowFactor = kMEqL < 3.5 ? 1 + 0.6 * (3.5 - kMEqL) : 1
+  const uWaveMv = kMEqL < 3.5 ? clamp((3.5 - kMEqL) * 4, 0, 15) : 0
+  const cellShared = { restingMv, upstrokePeak, upstrokeSlowFactor, plateauScale, repolSlowFactor, uWaveMv }
 
-          phases.forEach(phase => {
-            const [t0, t1] = phase.tRange
-            const col = AP_PHASE_COLORS[phase.id] || [100, 100, 100, 25]
-            p.fill(col[0], col[1], col[2], col[3])
-            p.noStroke()
-            p.rect(toX(t0), AP_PAD.t, toX(t1) - toX(t0), dH)
-          })
+  // ── AV conduction delay indicator (parasympathetic lengthens, no trace) ──
+  const avDelayMs = Math.round(clamp(140 * (1 + 0.9 * para - 0.25 * symp), 80, 500))
 
-          const hov = hoverPhaseRef.current
-          if (hov) {
-            const [ht0, ht1] = hov.tRange
-            const col = AP_PHASE_COLORS[hov.id] || [200, 200, 200, 80]
-            p.fill(col[0], col[1], col[2], 80)
-            p.noStroke()
-            p.rect(toX(ht0), AP_PAD.t, toX(ht1) - toX(ht0), dH)
-            const lx = toX((ht0 + ht1) / 2)
-            p.noStroke(); p.fill(240, 240, 240); p.textSize(8); p.textAlign(p.CENTER)
-            p.text(hov.label.split(' — ')[0], lx, AP_PAD.t - 6)
-          }
+  return {
+    symp, para, kMEqL, caMgDl, cycleMs, saRate, avDelayMs,
+    sa,
+    atrium: cellShared,
+    ventricle: cellShared,
+    purkinje: cellShared,
+    bothElevated: symp >= 0.5 && para >= 0.5,
+  }
+}
 
-          const gridVs = [-90, -60, -30, 0, 30]
-          gridVs.forEach(v => {
-            const gy = toY(v)
-            if (gy < AP_PAD.t || gy > AP_H - AP_PAD.b) return
-            p.stroke(v === 0 ? 80 : 45, v === 0 ? 95 : 55, v === 0 ? 120 : 72)
-            p.strokeWeight(v === 0 ? 1.0 : 0.5)
-            p.line(AP_PAD.l, gy, W - AP_PAD.r, gy)
-            p.noStroke(); p.fill(100, 110, 130); p.textSize(8); p.textAlign(p.RIGHT)
-            p.text(v + ' mV', AP_PAD.l - 4, gy + 3)
-          })
+// ── Parametric AP shape generators — sampled fresh whenever physiology
+// changes, reusing interpAP()'s fraction-space lookup convention so these
+// plug straight into TraceCanvas the same way the static 2C arrays do. ──
+//
+// SA node fires FIRST in the shared cycle. The other panels' own upstroke
+// already sits early in their [0,1] fraction space (see p0Start below), so
+// rather than shifting every panel, only the SA wave is rotated — its
+// upstroke (originally at phase4Frac, deep into its own [0,1] window) is
+// remapped to sit at shared t≈0, with the long Phase 4 pacemaker ramp now
+// occupying the END of the visible window, building back up to threshold
+// exactly as the cursor wraps into the next lap. That reads as "SA fires,
+// then everything else follows" instead of the reverse.
+function buildSAWave({ mdp, phase4Frac, threshold }, n = 60) {
+  const peak = 15
+  const upDur = clamp(0.10, 0.04, 0.94 - phase4Frac) // upstroke+repol duration, unrotated
+  const p0End = phase4Frac + upDur
+  // Rotated-space breakpoints: upstroke [0, upEndR], repol [upEndR, repolEndR], phase4 [repolEndR, 1]
+  const upEndR    = p0End - phase4Frac
+  const repolEndR = 1 - phase4Frac
 
-          p.stroke(52, 211, 153); p.strokeWeight(2.0); p.noFill()
-          p.beginShape()
-          data.forEach(([t, v]) => p.vertex(toX(t), toY(v)))
-          p.endShape()
+  const data = []
+  for (let i = 0; i <= n; i++) {
+    const tR = i / n                          // rotated (shared-timeline) fraction
+    const t  = (tR + phase4Frac) % 1           // original fraction, for the same formulas as before
+    let v
+    if (t <= phase4Frac) {
+      const f = phase4Frac === 0 ? 1 : t / phase4Frac
+      v = mdp + (threshold - mdp) * Math.pow(f, 1.6)
+    } else if (t <= p0End) {
+      v = threshold + (peak - threshold) * smooth01((t - phase4Frac) / (p0End - phase4Frac))
+    } else {
+      v = peak + (mdp - peak) * smooth01((t - p0End) / (1 - p0End))
+    }
+    data.push([tR, Math.round(v * 10) / 10])
+  }
+  const phases = [
+    { id: 'p0', label: 'Upstroke — ICa-L driven', tRange: [0, upEndR],
+      channels: 'ICa-L — NO fast INa', short: 'SA fires first — ICa-L opens. No fast INa — explains slow conduction velocity (~0.05 m/s)',
+      ions: 'Ca²⁺ in via L-type channels → slow, rounded upstroke. Much slower than ventricular upstroke since there is no fast INa here.' },
+    { id: 'repol', label: 'Repolarization', tRange: [upEndR, repolEndR],
+      channels: 'IK (delayed rectifier) + IK-ACh', short: 'Repolarization — IK + IK-ACh',
+      ions: 'K⁺ exits via delayed rectifiers and ACh-gated channels, returning toward the pacemaker potential.' },
+    { id: 'p4', label: 'Phase 4 — Pacemaker Potential', tRange: [repolEndR, 1],
+      channels: 'If (HCN channels) + ICa-T', short: 'Phase 4 — pacemaker potential (If — the pacemaker current) building toward the next beat',
+      ions: 'Na⁺/K⁺ slowly IN via If ("funny current"); Ca²⁺ via T-type channels → gradual depolarization toward threshold. Slope of this ramp sets heart rate — it reaches threshold right as the cursor loops back to fire again.' },
+  ]
+  return { data, phases }
+}
 
-          p.strokeWeight(0.6)
-          phases.forEach(({ tRange: [t0] }, i) => {
-            if (i === 0) return
-            const x = toX(t0)
-            p.stroke(60, 70, 90)
-            p.line(x, AP_PAD.t, x, AP_H - AP_PAD.b)
-          })
-        }
+// kind: 'ventricle' | 'purkinje' | 'atrium'. p0Start is deliberately earlier
+// for the atrium than for ventricle/Purkinje — real conduction reaches the
+// atrial myocardium almost immediately after SA firing, while ventricle/
+// Purkinje only fire after the AV delay, later in the shared cycle. That
+// ordering (SA → atrium → [AV delay] → ventricle/Purkinje) is what makes
+// "SA fires first" actually legible across all four panels at once.
+function buildWorkingCellWave({ restingMv, upstrokePeak, upstrokeSlowFactor, plateauScale, repolSlowFactor, uWaveMv }, kind, n = 100) {
+  const isPurkinje = kind === 'purkinje'
+  const isAtrium   = kind === 'atrium'
+  const cellRestingMv = isAtrium ? clamp(restingMv + 10, -100, -45) : restingMv // atrium's baseline is less negative (~ -80 vs -90)
+  const notchMv = cellRestingMv + (upstrokePeak - cellRestingMv) * 0.55
+  const plateauMv = isPurkinje ? 4 : isAtrium ? 0 : 2
+  const p0Start = isAtrium ? 0.05 : 0.182
+  const p0End = p0Start + (isPurkinje ? 0.021 : isAtrium ? 0.020 : 0.025) * upstrokeSlowFactor
+  const p1End = p0End + 0.020
+  const basePlateauDur = isPurkinje ? 0.315 : isAtrium ? 0.13 : 0.255
+  const p2End = p1End + basePlateauDur * plateauScale
+  const p3Dur = (isPurkinje ? 0.15 : isAtrium ? 0.09 : 0.10) * repolSlowFactor
+  const p3End = clamp(p2End + p3Dur, p2End + 0.02, 0.985)
+
+  const data = []
+  for (let i = 0; i <= n; i++) {
+    const t = i / n
+    let v
+    if (t < p0Start) {
+      v = cellRestingMv
+    } else if (t < p0End) {
+      v = cellRestingMv + (upstrokePeak - cellRestingMv) * smooth01((t - p0Start) / (p0End - p0Start))
+    } else if (t < p1End) {
+      v = upstrokePeak + (notchMv - upstrokePeak) * smooth01((t - p0End) / (p1End - p0End))
+    } else if (t < p2End) {
+      v = notchMv + (plateauMv - notchMv) * smooth01(Math.min(1, ((t - p1End) / (p2End - p1End)) * 3))
+    } else if (t < p3End) {
+      v = plateauMv + (cellRestingMv - plateauMv) * smooth01((t - p2End) / (p3End - p2End))
+    } else {
+      v = cellRestingMv
+      if (isPurkinje) v += 4 * smooth01((t - p3End) / (1 - p3End)) // slight Phase 4 automaticity (slow If)
+      if (uWaveMv > 0) {
+        const uCenter = p3End + (1 - p3End) * 0.35
+        const uWidth  = Math.max(0.01, (1 - p3End) * 0.28)
+        const d = (t - uCenter) / uWidth
+        v += uWaveMv * Math.exp(-d * d * 4)
       }
-
-      while (container.firstChild) container.removeChild(container.firstChild)
-      inst = new p5(sketch, container)
-    })
-    return () => {
-      cancelAnimationFrame(rafId)
-      if (inst) { try { inst.remove() } catch (_) {} }
-      while (container.firstChild) container.removeChild(container.firstChild)
     }
-  }, [data, phases])
+    data.push([t, Math.round(v * 10) / 10])
+  }
 
-  // Mouse detection: use canvas.getBoundingClientRect() + scaling to handle any CSS resize
-  const handleMouseMove = useCallback((e) => {
-    const canvas = containerRef.current?.querySelector('canvas')
-    if (!canvas) return
-    const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
-    const mx = (e.clientX - rect.left) * scaleX
-    const my = (e.clientY - rect.top) * scaleY
-    const dW = canvas.width - AP_PAD.l - AP_PAD.r
-    const inChart = mx >= AP_PAD.l && mx <= canvas.width - AP_PAD.r
-                 && my >= AP_PAD.t && my <= canvas.height - AP_PAD.b
-    if (!inChart) {
-      if (hoverPhaseRef.current) { hoverPhaseRef.current = null; onHover(null) }
-      return
-    }
-    const tFrac = (mx - AP_PAD.l) / dW
-    const phase = phases.find(ph => tFrac >= ph.tRange[0] && tFrac < ph.tRange[1]) || null
-    hoverPhaseRef.current = phase
-    onHover(phase ? { panelKey, panelTitle: title, phase } : null)
-  }, [phases, panelKey, title, onHover])
+  const label0 = isPurkinje ? 'Phase 0 — Fastest Upstroke' : 'Phase 0 — Fast Upstroke'
+  const phases = [
+    { id: 'p4r', label: 'Phase 4 — Resting Potential', tRange: [0, p0Start],
+      channels: isPurkinje ? 'IK1 + slow If' : 'IK1 (inward rectifier)',
+      short: isAtrium ? 'Phase 4 — resting potential (IK1). Fires almost immediately after SA.' : 'Phase 4 — resting potential (IK1)',
+      ions: 'K⁺ outward via IK1 holds a stable resting potential until an external stimulus arrives.' },
+    { id: 'p0', label: label0, tRange: [p0Start, p0End],
+      channels: isPurkinje ? 'INa (fast) — highest dV/dt in heart' : 'INa (fast voltage-gated Na⁺)',
+      short: 'Phase 0 — Rapid depolarization (INa opens)',
+      ions: 'Na⁺ rushes in through fast channels → rapid upstroke. IK1 closes as INa snaps open.' },
+    { id: 'p1', label: 'Phase 1 — Early Repolarization', tRange: [p0End, p1End],
+      channels: 'Ito (transient outward K⁺)', short: 'Phase 1 — transient notch (Ito)',
+      ions: 'K⁺ briefly exits via Ito, creating the notch between the upstroke and the plateau.' },
+    { id: 'p2', label: isAtrium ? 'Phase 2 — Brief Plateau' : 'Phase 2 — Plateau', tRange: [p1End, p2End],
+      channels: 'ICa-L (in) balanced vs IKr + IKs (out)', short: 'Phase 2 — plateau (ICa-L opens, IKr begins activating)',
+      ions: isAtrium
+        ? 'Ca²⁺ in via ICa-L balanced by K⁺ out — much briefer than the ventricular plateau, giving atrial cells a shorter refractory period.'
+        : 'Ca²⁺ in via ICa-L is balanced by K⁺ starting to exit via IKr/IKs, holding the plateau near 0 mV.' },
+    { id: 'p3', label: 'Phase 3 — Rapid Repolarization', tRange: [p2End, p3End],
+      channels: 'IKr + IKs (rapid + slow delayed rectifiers)', short: 'Phase 3 — ICa-L closes, IKr/IKs drive repolarization',
+      ions: 'ICa-L inactivates; IKr and IKs dominate → rapid return toward resting potential.' },
+    { id: 'p4d', label: 'Phase 4 — Electrical Diastole', tRange: [p3End, 1],
+      channels: isPurkinje ? 'IK1 (± slow If)' : 'IK1 (inward rectifier)',
+      short: 'Phase 4 — IK1 maintains resting potential',
+      ions: isPurkinje
+        ? 'IK1 stabilizes the resting potential; a slow If gives Purkinje fibers slight backup automaticity if SA/AV both fail.'
+        : 'IK1 maintains a stable resting potential — no spontaneous depolarization, unlike the SA node.' },
+  ]
+  return { data, phases }
+}
 
-  const handleMouseLeave = useCallback(() => {
-    hoverPhaseRef.current = null
-    onHover(null)
-  }, [onHover])
+const PHASE_NUMBER = { p4r: '4', p0: '0', p1: '1', p2: '2', p3: '3', p4d: '4' }
 
+// ── Ion channel gating tables — per-phase openness (0–1), looked up by the
+// CURRENT phase id each frame. No hover required: IonChannelRow below reads
+// the shared clock directly and updates automatically as the cursor moves. ──
+const SA_ION_CHANNELS = [
+  { id: 'If',   label: 'If',       note: 'If — the pacemaker current', levels: { p4: 1,    p0: 0.15, repol: 0.10 } },
+  { id: 'ICaT', label: 'ICa-T',    note: 'T-type Ca²⁺ — activates near threshold', levels: { p4: 0.65, p0: 0.20, repol: 0 } },
+  { id: 'ICaL', label: 'ICa-L',    note: 'L-type Ca²⁺ — drives the SA upstroke (NOT INa)', levels: { p4: 0.05, p0: 1,    repol: 0.10 } },
+  { id: 'IK',   label: 'IK/IKAch', note: 'Delayed rectifier + ACh-gated K⁺', levels: { p4: 0.10, p0: 0,    repol: 1 } },
+]
+const MYO_ION_CHANNELS = [
+  { id: 'INa',  label: 'INa',  note: 'Fast Na⁺ — snaps open at Phase 0', levels: { p4r: 0,    p0: 1,    p1: 0.05, p2: 0,    p3: 0,    p4d: 0 } },
+  { id: 'IK1',  label: 'IK1',  note: 'Inward rectifier — holds resting potential, closes on upstroke', levels: { p4r: 1, p0: 0.05, p1: 0.10, p2: 0.10, p3: 0.20, p4d: 1 } },
+  { id: 'Ito',  label: 'Ito',  note: 'Transient outward — brief Phase 1 notch', levels: { p4r: 0, p0: 0.10, p1: 1,    p2: 0.15, p3: 0,    p4d: 0 } },
+  { id: 'ICaL', label: 'ICa-L', note: 'L-type Ca²⁺ — the plateau current', levels: { p4r: 0,   p0: 0.20, p1: 0.40, p2: 1,    p3: 0.25, p4d: 0 } },
+  { id: 'IKr',  label: 'IKr',  note: 'Rapid delayed rectifier — begins in Phase 2, dominant in Phase 3', levels: { p4r: 0, p0: 0,    p1: 0.10, p2: 0.45, p3: 1,    p4d: 0.10 } },
+  { id: 'IKs',  label: 'IKs',  note: 'Slow delayed rectifier — joins IKr for repolarization', levels: { p4r: 0, p0: 0,    p1: 0.05, p2: 0.35, p3: 0.90, p4d: 0.10 } },
+]
+const PK_ION_CHANNELS = [
+  { id: 'INa',  label: 'INa',  note: 'Fastest Na⁺ upstroke in the heart (highest dV/dt)', levels: { p4r: 0,   p0: 1,    p1: 0.05, p2: 0,    p3: 0,    p4d: 0 } },
+  { id: 'IK1',  label: 'IK1',  note: 'Inward rectifier — dominant at rest', levels: { p4r: 1, p0: 0.05, p1: 0.10, p2: 0.10, p3: 0.20, p4d: 0.80 } },
+  { id: 'Ito',  label: 'Ito',  note: 'Transient outward — brief Phase 1 notch', levels: { p4r: 0, p0: 0.10, p1: 1,    p2: 0.15, p3: 0,    p4d: 0 } },
+  { id: 'ICaL', label: 'ICa-L', note: 'L-type Ca²⁺ — the longest plateau of any cardiac cell', levels: { p4r: 0, p0: 0.20, p1: 0.40, p2: 1,  p3: 0.25, p4d: 0 } },
+  { id: 'IKr',  label: 'IKr',  note: 'Rapid delayed rectifier', levels: { p4r: 0, p0: 0, p1: 0.10, p2: 0.45, p3: 1,    p4d: 0.10 } },
+  { id: 'IKs',  label: 'IKs',  note: 'Slow delayed rectifier', levels: { p4r: 0, p0: 0, p1: 0.05, p2: 0.35, p3: 0.90, p4d: 0.10 } },
+  { id: 'If',   label: 'If (slow)', note: 'Slight automaticity — backup pacemaker if SA/AV both fail', levels: { p4r: 0.05, p0: 0, p1: 0, p2: 0, p3: 0, p4d: 0.35 } },
+]
+const ATRIAL_ION_CHANNELS = [
+  { id: 'INa',  label: 'INa',  note: 'Fast Na⁺ — snaps open at Phase 0', levels: { p4r: 0,    p0: 1,    p1: 0.05, p2: 0,    p3: 0,    p4d: 0 } },
+  { id: 'IK1',  label: 'IK1',  note: 'Inward rectifier — holds resting potential, closes on upstroke', levels: { p4r: 1, p0: 0.05, p1: 0.10, p2: 0.10, p3: 0.20, p4d: 1 } },
+  { id: 'Ito',  label: 'Ito',  note: 'Transient outward — brief Phase 1 notch', levels: { p4r: 0, p0: 0.10, p1: 1,    p2: 0.15, p3: 0,    p4d: 0 } },
+  { id: 'ICaL', label: 'ICa-L', note: 'L-type Ca²⁺ — a much briefer plateau than ventricle', levels: { p4r: 0,  p0: 0.20, p1: 0.40, p2: 1,    p3: 0.25, p4d: 0 } },
+  { id: 'IKr',  label: 'IKr',  note: 'Rapid delayed rectifier — begins in Phase 2, dominant in Phase 3', levels: { p4r: 0, p0: 0,    p1: 0.10, p2: 0.45, p3: 1,    p4d: 0.10 } },
+  { id: 'IKs',  label: 'IKs',  note: 'Slow delayed rectifier — joins IKr for repolarization', levels: { p4r: 0, p0: 0,    p1: 0.05, p2: 0.35, p3: 0.90, p4d: 0.10 } },
+]
+
+// Always-visible glossary of every channel abbreviation used across the four
+// panels — the badges themselves stay compact (INa, IKr, …) so the row can't
+// grow past this small strip, but nobody should have to hover to learn what
+// an abbreviation stands for.
+const ION_CHANNEL_GLOSSARY = [
+  { id: 'If',    name: 'Funny current',              detail: 'HCN channels — the SA node’s pacemaker current' },
+  { id: 'ICa-T', name: 'T-type calcium current',      detail: 'activates near threshold, helps trigger SA upstroke' },
+  { id: 'ICa-L', name: 'L-type calcium current',      detail: 'SA node upstroke; the plateau current everywhere else' },
+  { id: 'IK / IK-ACh', name: 'Delayed rectifier / ACh-gated K⁺', detail: 'repolarizes the SA node; ACh (vagal) opens IK-ACh' },
+  { id: 'INa',   name: 'Fast sodium current',         detail: 'the rapid Phase 0 upstroke in atrium, ventricle, Purkinje' },
+  { id: 'IK1',   name: 'Inward rectifier K⁺',         detail: 'holds the resting potential; closes during the upstroke' },
+  { id: 'Ito',   name: 'Transient outward K⁺',        detail: 'brief Phase 1 notch right after the upstroke' },
+  { id: 'IKr',   name: 'Rapid delayed rectifier K⁺',  detail: 'drives Phase 3 repolarization (the hERG channel)' },
+  { id: 'IKs',   name: 'Slow delayed rectifier K⁺',   detail: 'joins IKr for Phase 3 repolarization' },
+]
+function IonChannelGlossary() {
   return (
-    <div
-      className={`flex-1 min-w-0 border-r border-gray-800 last:border-r-0 ${isSelected ? 'ring-1 ring-cyan-500/50' : ''}`}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-    >
-      <div className="flex items-baseline gap-2 px-3 pt-1.5 pb-0.5">
-        <span className="text-xs font-semibold text-gray-200">{title}</span>
-        <span className="text-xs text-gray-500">{sub}</span>
+    <div className="mt-2 rounded-xl border border-gray-800 bg-gray-900/60 p-2.5">
+      <h3 className="text-xs font-semibold text-gray-300 mb-1.5">Ion channel key</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-1">
+        {ION_CHANNEL_GLOSSARY.map(ch => (
+          <div key={ch.id} className="flex items-baseline gap-2 text-xs">
+            <span className="font-mono text-amber-300 shrink-0 w-24">{ch.id}</span>
+            <span className="text-gray-400 leading-snug">
+              <span className="text-gray-200">{ch.name}</span> — {ch.detail}
+            </span>
+          </div>
+        ))}
       </div>
-      <div ref={containerRef} />
     </div>
   )
 }
 
-function ActionPotentials({ selectedKey }) {
-  const [ionInfo, setIonInfo] = useState(null)
+// Ion channel badge row — reads clockRef directly and mutates DOM opacity
+// via refs (same technique HeartAnimation.jsx uses) so 3 panels animating
+// at once don't force a React re-render 60x/second.
+function IonChannelRow({ clockRef, cycleMs, phases, channels }) {
+  const phasesRef = useRef(phases)
+  useEffect(() => { phasesRef.current = phases }, [phases])
+  const elRefs = useRef({})
 
-  const panels = useMemo(() => [
-    { key: 'sa',       title: 'SA Node',                      sub: 'Automaticity',              data: SA_AP,  phases: SA_PHASES  },
-    { key: 'myocyte',  title: 'Atrial / Ventricular Myocyte', sub: 'Phases 0–4',                data: MYO_AP, phases: MYO_PHASES },
-    { key: 'purkinje', title: 'Purkinje Fiber',               sub: 'Fastest · Longest plateau', data: PK_AP,  phases: PK_PHASES  },
-  ], [])
+  useEffect(() => {
+    let rafId
+    const frame = () => {
+      const frac = ((clockRef.current.tInCycle / cycleMs) % 1 + 1) % 1
+      const list = phasesRef.current
+      const phase = list.find(ph => frac >= ph.tRange[0] && frac < ph.tRange[1]) || list[list.length - 1]
+      channels.forEach(ch => {
+        const el = elRefs.current[ch.id]
+        if (!el) return
+        const level = phase ? (ch.levels[phase.id] ?? 0) : 0
+        el.style.opacity = String(0.18 + 0.82 * level)
+        el.style.transform = `scale(${(1 + 0.35 * level).toFixed(2)})`
+        el.style.boxShadow = level > 0.5 ? `0 0 ${Math.round(6 * level)}px #fbbf24` : 'none'
+      })
+      rafId = requestAnimationFrame(frame)
+    }
+    rafId = requestAnimationFrame(frame)
+    return () => cancelAnimationFrame(rafId)
+  }, [clockRef, cycleMs, channels])
+
+  return (
+    <div className="flex flex-wrap gap-1 px-3 py-1.5 border-t border-gray-800/70 bg-gray-950/40">
+      {channels.map(ch => (
+        <div key={ch.id} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-gray-700/60" title={ch.note}>
+          <span
+            ref={el => { elRefs.current[ch.id] = el }}
+            className="w-2 h-2 rounded-full bg-amber-400 transition-transform duration-150"
+          />
+          <span className="text-[10px] font-mono text-gray-300">{ch.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Live phase-description line — same DOM-ref-mutation technique, no hover
+// required. Text snaps to whichever phase the cursor currently sits in.
+function PhaseLabel({ clockRef, cycleMs, phases }) {
+  const ref = useRef(null)
+  const phasesRef = useRef(phases)
+  useEffect(() => { phasesRef.current = phases }, [phases])
+  useEffect(() => {
+    let rafId
+    const frame = () => {
+      const frac = ((clockRef.current.tInCycle / cycleMs) % 1 + 1) % 1
+      const list = phasesRef.current
+      const phase = list.find(ph => frac >= ph.tRange[0] && frac < ph.tRange[1])
+      if (ref.current) ref.current.textContent = phase ? phase.short : ''
+      rafId = requestAnimationFrame(frame)
+    }
+    rafId = requestAnimationFrame(frame)
+    return () => cancelAnimationFrame(rafId)
+  }, [clockRef, cycleMs])
+  return <p ref={ref} className="text-[11px] text-cyan-300 font-mono px-3 pt-1 min-h-[14px] leading-snug" />
+}
+
+// One live panel = trace (TraceCanvas) + optional phase-number bands +
+// live phase description + the ion channel row underneath.
+function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, color, showPhaseNumbers }) {
+  const xDomain = useMemo(() => [0, cycleMs], [cycleMs])
+  const phaseMarkers = useMemo(
+    () => phases.map(ph => {
+      const col = AP_PHASE_COLORS[ph.id] || [100, 100, 100, 25]
+      return { x0: ph.tRange[0] * cycleMs, x1: ph.tRange[1] * cycleMs, color: `rgba(${col[0]},${col[1]},${col[2]},${(col[3] / 255).toFixed(2)})` }
+    }),
+    [phases, cycleMs]
+  )
+  const bandLabels = useMemo(
+    () => (showPhaseNumbers
+      ? phases.map(ph => ({ x: (ph.tRange[0] + ph.tRange[1]) / 2 * cycleMs, text: PHASE_NUMBER[ph.id] || '' }))
+      : null),
+    [phases, cycleMs, showPhaseNumbers]
+  )
+  const valueAt = useCallback((t) => interpAP(data, t / cycleMs), [data, cycleMs])
+
+  return (
+    <div className="rounded-xl border border-gray-800 bg-gray-900/60 overflow-hidden flex-1 min-w-0">
+      <div className="px-3 pt-1.5 pb-0.5">
+        <div className="text-xs font-semibold text-gray-100 leading-snug">{title}</div>
+        <div className="text-[10px] text-gray-500 leading-snug">{sub}</div>
+      </div>
+      <div className="flex items-baseline justify-between px-3 pb-0.5">
+        <span className="text-[10px] font-semibold" style={{ color }}>Membrane Potential (mV)</span>
+        <span className="text-[9px] text-gray-600">−100 to +50 mV — NOT what an ECG records</span>
+      </div>
+      <TraceCanvas
+        clockRef={clockRef}
+        valueAt={valueAt}
+        xDomain={xDomain}
+        yDomain={AP_Y_DOMAIN}
+        color={color}
+        phaseMarkers={phaseMarkers}
+        bandLabels={bandLabels}
+        height={112}
+      />
+      <PhaseLabel clockRef={clockRef} cycleMs={cycleMs} phases={phases} />
+      <IonChannelRow clockRef={clockRef} cycleMs={cycleMs} phases={phases} channels={channels} />
+    </div>
+  )
+}
+
+function LabeledSlider({ label, value, onChange, min, max, step = 1, unit = '', accent = 'accent-cyan-500', formatValue }) {
+  return (
+    <div className="flex-1 min-w-[220px]">
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="text-xs text-gray-300">{label}</span>
+        <span className="text-xs font-mono text-gray-400">{formatValue ? formatValue(value) : `${value}${unit}`}</span>
+      </div>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        className={`w-full ${accent}`}
+      />
+    </div>
+  )
+}
+
+function kBarColor(k) {
+  if (k < 3.5 || k > 5.5) return k < 3.0 || k > 7.0 ? '#ef4444' : '#f59e0b'
+  return '#10b981'
+}
+
+const SPEEDS = [0.25, 0.5, 1]
+
+function LiveActionPotentials() {
+  const [sympathetic, setSympathetic] = useState(20)
+  const [parasympathetic, setParasympathetic] = useState(20)
+  const [kMEqL, setKMEqL] = useState(4.0)
+  const [caMgDl, setCaMgDl] = useState(9.5)
+  const [speed, setSpeed] = useState(1)
+
+  const phys = useMemo(
+    () => computeAPPhysiology({ sympathetic, parasympathetic, kMEqL, caMgDl }),
+    [sympathetic, parasympathetic, kMEqL, caMgDl]
+  )
+  const sa  = useMemo(() => buildSAWave(phys.sa), [phys.sa])
+  const atr = useMemo(() => buildWorkingCellWave(phys.atrium, 'atrium'), [phys.atrium])
+  const myo = useMemo(() => buildWorkingCellWave(phys.ventricle, 'ventricle'), [phys.ventricle])
+  const pk  = useMemo(() => buildWorkingCellWave(phys.purkinje, 'purkinje'), [phys.purkinje])
+
+  const { clockRef, tMs, isPlaying, toggle, scrub } = useLocalClock(phys.cycleMs, null, speed)
+
+  const kPct = clamp((kMEqL - 2) / (9 - 2) * 100, 0, 100)
 
   return (
     <div>
-      <div className="rounded-xl border border-gray-800 overflow-hidden mb-2">
-        <div className="flex items-center justify-between bg-gray-900 border-b border-gray-800 px-3 py-1.5 text-xs text-gray-400">
-          <span>Hover within a panel to see ion channel detail for that phase</span>
-          {selectedKey && (
-            <span className="text-cyan-400">
-              Highlighting: {selectedKey === 'sa' ? 'SA Node' : selectedKey === 'myocyte' ? 'Myocyte' : 'Purkinje'} (from 2A)
-            </span>
-          )}
-        </div>
-        {/* Side by side instead of stacked — three panels stacked vertically
-            cost ~3×AP_H of scroll; a row costs one AP_H total. Each panel's
-            canvas already sizes itself from its own container width via
-            clientWidth, so this needs no changes beyond the wrapper layout. */}
-        <div className="flex">
-          {panels.map(panel => (
-            <APPanel
-              key={panel.key}
-              panelKey={panel.key}
-              title={panel.title}
-              sub={panel.sub}
-              data={panel.data}
-              phases={panel.phases}
-              isSelected={selectedKey === panel.key}
-              onHover={setIonInfo}
-            />
+      {/* Four synchronized live panels, in conduction order: SA fires first,
+          then the atrium (almost immediately), then — after the AV delay —
+          ventricle and Purkinje fire together. */}
+      <p className="text-[11px] text-gray-500 mb-1">
+        The cursor loops once per cardiac cycle. Watch the order: SA node fires first, the atrium follows almost
+        immediately, then ventricle and Purkinje fire together after the AV delay.
+      </p>
+      <div className="flex flex-col lg:flex-row gap-2 items-stretch">
+        <APLivePanel
+          clockRef={clockRef} cycleMs={phys.cycleMs}
+          title="SA Node — Automaticity" sub="(no external stimulus needed) — fires first"
+          data={sa.data} phases={sa.phases} channels={SA_ION_CHANNELS}
+          color="#34d399" showPhaseNumbers={false}
+        />
+        <APLivePanel
+          clockRef={clockRef} cycleMs={phys.cycleMs}
+          title="Atrial Myocyte" sub="Fires just after SA — brief plateau"
+          data={atr.data} phases={atr.phases} channels={ATRIAL_ION_CHANNELS}
+          color="#fbbf24" showPhaseNumbers={false}
+        />
+        <APLivePanel
+          clockRef={clockRef} cycleMs={phys.cycleMs}
+          title="Ventricular Myocyte" sub="Working myocardium (Phases 0–4) — fires after the AV delay"
+          data={myo.data} phases={myo.phases} channels={MYO_ION_CHANNELS}
+          color="#60a5fa" showPhaseNumbers
+        />
+        <APLivePanel
+          clockRef={clockRef} cycleMs={phys.cycleMs}
+          title="Purkinje Fiber" sub="Fastest conduction, longest plateau"
+          data={pk.data} phases={pk.phases} channels={PK_ION_CHANNELS}
+          color="#a78bfa" showPhaseNumbers={false}
+        />
+      </div>
+      <IonChannelGlossary />
+
+      {/* Playback controls — one clock drives all three panels */}
+      <div className="flex items-center gap-3 flex-wrap mt-2 rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-2">
+        <button
+          onClick={toggle}
+          className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-white transition-colors"
+        >
+          {isPlaying ? 'Pause' : 'Play'}
+        </button>
+        <input
+          type="range"
+          min={0} max={phys.cycleMs}
+          value={Math.min(Math.max(tMs, 0), phys.cycleMs)}
+          onChange={e => scrub(Number(e.target.value))}
+          className="flex-1 min-w-[120px] accent-emerald-500"
+        />
+        <span className="text-xs font-mono text-gray-500 tabular-nums w-28">{Math.round(tMs)} / {Math.round(phys.cycleMs)} ms</span>
+        <div className="flex items-center gap-1">
+          {SPEEDS.map(s => (
+            <button
+              key={s}
+              onClick={() => setSpeed(s)}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-mono border transition-colors ${
+                speed === s
+                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/50'
+                  : 'bg-gray-800 text-gray-500 border-gray-700 hover:text-gray-300'
+              }`}
+            >
+              {s}×
+            </button>
           ))}
         </div>
       </div>
-      {ionInfo ? (
-        <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-2.5 text-xs">
-          <div className="text-xs text-cyan-400 mb-1.5">{ionInfo.panelTitle} — {ionInfo.phase.label}</div>
-          <InfoRow label="Key channels" value={ionInfo.phase.channels} />
-          <InfoRow label="Ion movement" value={ionInfo.phase.ions} />
+
+      {/* ── ANS controls ── */}
+      <div className="mt-2 rounded-xl border border-gray-800 bg-gray-900/60 p-3">
+        <h3 className="text-sm font-semibold text-white mb-1.5">Autonomic Nervous System</h3>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <LabeledSlider
+            label="Sympathetic Tone" value={sympathetic} min={0} max={100}
+            onChange={setSympathetic} unit="%" accent="accent-red-500"
+          />
+          <LabeledSlider
+            label="Parasympathetic Tone" value={parasympathetic} min={0} max={100}
+            onChange={setParasympathetic} unit="%" accent="accent-blue-500"
+          />
         </div>
-      ) : (
-        <div className="rounded-xl border border-gray-800 bg-gray-900/40 px-3 py-2 text-xs text-gray-600 text-center">
-          Hover over a phase region to see ion channel detail
+        <div className="grid sm:grid-cols-2 gap-2 mt-2">
+          <Callout>
+            <strong>Sympathetic (β1 adrenergic):</strong> Noradrenaline / adrenaline → β1 receptor → ↑ If, ↑ ICa-L.
+            SA node Phase 4 slope steepens (faster automaticity) and cycle shortens; max diastolic potential becomes
+            slightly less negative. Ventricular/Purkinje AP duration slightly shortens (upstroke unchanged).
+          </Callout>
+          <Callout>
+            <strong>Parasympathetic (M2 cholinergic):</strong> ACh → M2 receptor → IKAch opens → hyperpolarization.
+            SA node Phase 4 slope flattens, max diastolic potential hyperpolarizes, and the cycle lengthens
+            dramatically at high tone. Parasympathetic has minimal direct effect on ventricular myocytes — they
+            have few M2 receptors.
+          </Callout>
         </div>
-      )}
+        <div className="flex flex-wrap items-center gap-3 mt-2 px-3 py-1.5 rounded-lg bg-gray-950/50 border border-gray-800">
+          <span className="text-xs text-gray-400">AV node conduction delay</span>
+          <span className="text-sm font-mono text-amber-300">Δt ≈ {phys.avDelayMs} ms</span>
+          <span className="text-[11px] text-gray-600">Bridges to the PR interval in Module 2, Lab 2 — no ECG shown here.</span>
+        </div>
+        {phys.bothElevated && (
+          <div className="mt-1.5 px-3 py-1 rounded-lg bg-purple-950/40 border border-purple-700/40 text-xs text-purple-300">
+            Competing inputs — autonomic balance determines net heart rate.
+          </div>
+        )}
+      </div>
+
+      {/* ── Ion concentration controls ── */}
+      <div className="mt-2 rounded-xl border border-gray-800 bg-gray-900/60 p-3">
+        <h3 className="text-sm font-semibold text-white mb-1.5">Extracellular Ion Concentrations</h3>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 min-w-[220px]">
+            <LabeledSlider
+              label="Extracellular [K⁺]" value={kMEqL} min={2.0} max={9.0} step={0.1}
+              onChange={setKMEqL} unit=" mEq/L" accent="accent-orange-500"
+              formatValue={v => `${v.toFixed(1)} mEq/L`}
+            />
+            <div className="h-1.5 rounded-full bg-gray-800 mt-1 overflow-hidden">
+              <div className="h-full transition-all" style={{ width: `${kPct}%`, backgroundColor: kBarColor(kMEqL) }} />
+            </div>
+            <p className="text-[10px] text-gray-600 mt-1">Normal range 3.5–5.0 mEq/L</p>
+          </div>
+          <LabeledSlider
+            label="Extracellular [Ca²⁺]" value={caMgDl} min={5.0} max={15.0} step={0.1}
+            onChange={setCaMgDl} unit=" mg/dL" accent="accent-teal-500"
+            formatValue={v => `${v.toFixed(1)} mg/dL`}
+          />
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-2 mt-2">
+          {kMEqL > 5.5 ? (
+            <Callout>
+              ↑ [K⁺]out reduces the K⁺ driving force → EK shifts toward 0 → resting Vm follows EK (Nernst equation).
+              AP amplitude decreases, and Phase 0 upstroke slows as Na⁺ channels are partially inactivated.
+            </Callout>
+          ) : kMEqL < 3.5 ? (
+            <Callout>
+              ↓ [K⁺]out makes resting membrane potential more negative. Phase 3 repolarization slows (reduced IK
+              driving force), SA node automaticity paradoxically increases slightly, and a small U-wave analog
+              appears on the ventricular trace after Phase 3.
+            </Callout>
+          ) : (
+            <Callout>Extracellular [K⁺] is within the normal 3.5–5.0 mEq/L range — resting potential and repolarization are unaffected.</Callout>
+          )}
+          {caMgDl < 8.5 ? (
+            <Callout>↓ [Ca²⁺]out → reduced ICa-L → prolonged plateau. Phase 2 lengthens and AP duration increases.</Callout>
+          ) : caMgDl > 10.5 ? (
+            <Callout>↑ [Ca²⁺]out → enhanced ICa-L → shortened plateau. Phase 2 shortens and AP duration decreases.</Callout>
+          ) : (
+            <Callout>Extracellular [Ca²⁺] is within the normal 8.5–10.5 mg/dL range — the plateau duration is unaffected.</Callout>
+          )}
+        </div>
+
+        {kMEqL >= 7.0 && (
+          <div className="mt-1.5 px-3 py-1.5 rounded-lg bg-red-950/40 border border-red-700/40 text-xs text-red-300 font-medium">
+            ⚠ Critical hyperkalemia — conduction severely impaired.
+          </div>
+        )}
+      </div>
+
+      {/* No ECG in this section — intracellular recordings only */}
+      <p className="mt-2 text-[11px] text-gray-600 text-center leading-relaxed">
+        The traces above require an intracellular microelectrode. An ECG cannot measure membrane potential — see section 2C.
+      </p>
     </div>
   )
 }
@@ -747,7 +1119,7 @@ function ActionPotentials({ selectedKey }) {
 // nativeCycleMs/cycleMs are kept on the ref (not just closed over) so the
 // SAME clock instance driving the AP/ECG canvases below can also drive the
 // real conduction animation in sync.
-function useLocalClock(cycleMs, nativeCycleMs = null) {
+function useLocalClock(cycleMs, nativeCycleMs = null, speed = 1) {
   const clockRef = useRef({ tInCycle: 0, cycleMs, nativeCycleMs })
   const [tMs, setTMs] = useState(0)
   const isPlayingRef = useRef(true)
@@ -762,7 +1134,7 @@ function useLocalClock(cycleMs, nativeCycleMs = null) {
     let lastTs = null, raf
     const tick = (ts) => {
       if (isPlayingRef.current && lastTs !== null) {
-        const dt = Math.min(ts - lastTs, 50)
+        const dt = Math.min(ts - lastTs, 50) * speed
         const newT = (clockRef.current.tInCycle + dt) % cycleMs
         clockRef.current.tInCycle = newT
         setTMs(Math.round(newT))
@@ -772,7 +1144,7 @@ function useLocalClock(cycleMs, nativeCycleMs = null) {
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [cycleMs])
+  }, [cycleMs, speed])
 
   const setPlaying = useCallback((v) => { isPlayingRef.current = v; setIsPlaying(v) }, [])
   const toggle = useCallback(() => setPlaying(!isPlayingRef.current), [setPlaying])
@@ -783,7 +1155,7 @@ function useLocalClock(cycleMs, nativeCycleMs = null) {
 
 // Generic time-series canvas: draws valueAt(t) over xDomain, with an optional
 // set of shaded phase bands and a cursor synced to clockRef's live position.
-function TraceCanvas({ clockRef, valueAt, xDomain, yDomain, color, phaseMarkers, height = 130 }) {
+function TraceCanvas({ clockRef, valueAt, xDomain, yDomain, color, phaseMarkers, bandLabels, height = 130 }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
 
@@ -828,6 +1200,18 @@ function TraceCanvas({ clockRef, valueAt, xDomain, yDomain, color, phaseMarkers,
         })
       }
 
+      // Small numeral drawn at the top of each phase band — e.g. the
+      // ventricular panel's 0/1/2/3/4 phase numbers called out in the spec.
+      if (bandLabels) {
+        ctx.font = 'bold 10px monospace'
+        ctx.textAlign = 'center'
+        ctx.fillStyle = 'rgba(226,232,240,0.65)'
+        bandLabels.forEach(({ x, text }) => {
+          if (x < x0 || x > x1) return
+          ctx.fillText(text, toX(x), PAD.t + 11)
+        })
+      }
+
       ctx.strokeStyle = '#374151'
       ctx.lineWidth = 0.5
       ctx.fillStyle = '#6b7280'
@@ -869,7 +1253,7 @@ function TraceCanvas({ clockRef, valueAt, xDomain, yDomain, color, phaseMarkers,
     const ro = new ResizeObserver(resize)
     ro.observe(container)
     return () => { cancelAnimationFrame(rafId); ro.disconnect() }
-  }, [valueAt, xDomain, yDomain, phaseMarkers, color, height, clockRef])
+  }, [valueAt, xDomain, yDomain, phaseMarkers, bandLabels, color, height, clockRef])
 
   return (
     <div ref={containerRef} className="w-full">
@@ -1945,6 +2329,7 @@ export default function CardiacBridge() {
       moduleId="cardiac"
       number={2}
       title="Cardiac electrophysiology"
+      wide={active === '2B'}
     >
       {active === '2A' && (
         <Section
@@ -1968,7 +2353,7 @@ export default function CardiacBridge() {
           title="Action Potentials by Cell Type"
           subtitle="Three fundamentally different action potential shapes — each explained by different ion channel composition. Hover any phase region to see which channels are open and what they do."
         >
-          <ActionPotentials selectedKey={null} />
+          <LiveActionPotentials />
           <Callout>
             SA node and AV node use <strong>slow-response</strong> action potentials (ICa-L upstroke, ~0.05 m/s).
             Atrial and ventricular myocytes use <strong>fast-response</strong> (INa upstroke, 1 m/s).

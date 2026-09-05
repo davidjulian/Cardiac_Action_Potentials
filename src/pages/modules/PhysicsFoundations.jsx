@@ -5,7 +5,7 @@ import LeadPlacementLab from '../../components/LeadPlacementLab'
 import { useTabState, usePublishTabs } from '../../components/ModuleTabs'
 
 const TABS = [
-  { id: '1A', label: '1A · Charges' },
+  { id: '1A', label: '1A · Charges', badge: 'Optional' },
   { id: '1B', label: '1B · Dipole' },
   { id: '1C', label: '1C · Dot Product' },
   { id: '1D', label: '1D · Depolarization' },
@@ -1336,6 +1336,10 @@ export default function PhysicsFoundations() {
       {/* ── 1D ──────────────────────────────────────────────────────────────── */}
       {active === '1D' && (
         <Section label="1D" title="Depolarization and repolarization of a cell generate a dipole">
+          <p className="text-xs text-gray-500 leading-snug mb-2 italic">
+            If you'd like to explore the physics of electric fields interactively before continuing,
+            Section 1A covers point charges. Otherwise you're in the right place.
+          </p>
           <p className="text-xs text-gray-400 leading-snug mb-2">
             Ten cells sit side by side, each polarized (+ outside) at rest. Press play: a wave of
             depolarization sweeps left→right, flipping each cell's exterior charge negative in turn,

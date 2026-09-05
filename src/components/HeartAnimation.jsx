@@ -1,5 +1,53 @@
 ﻿import { useEffect, useRef, useMemo } from 'react'
 
+// ─── Multi-beat conducted-beat series ──────────────────────────────────────
+// A repeating multi-beat `waves` array (irregular SA firing, a fusion
+// cycle's plain-conducted beats, etc.) shares the same wave *names* across
+// every beat, distinguished only by `center`. Unlike `beatWindows` below
+// (which anchors to the first-match wave in the whole array via closures
+// over the full `waves` list), this walks every `Q` occurrence and builds
+// one normal SA→atria→AV→His→ventricle→repol window set per beat, matching
+// each beat's own nearby P/R/S/T by nearest-center — the same
+// nearest-occurrence pattern already used by the 'pvcs'/'pacs'/'mobitzI'/
+// 'mobitzII' cases below for their own multi-beat waves.
+function buildBeatSeries(waves, { avState = 'active' } = {}) {
+  const pWaves = waves.filter(wv => wv.name === 'P')
+  const qWaves = waves.filter(wv => wv.name === 'Q')
+  const rWaves = waves.filter(wv => wv.name === 'R')
+  const sWaves = waves.filter(wv => wv.name === 'S')
+  const tWaves = waves.filter(wv => wv.name === 'T')
+  const map = []
+  qWaves.forEach(qw => {
+    const qOn   = qw.center - 2 * qw.sigma
+    const nearP = pWaves.reduce((b, pv) => Math.abs(pv.center - qw.center) < Math.abs(b.center - qw.center) ? pv : b, { center: 9999, sigma: 25 })
+    const nearR = rWaves.reduce((b, rv) => Math.abs(rv.center - qw.center) < Math.abs(b.center - qw.center) ? rv : b, { center: 9999, sigma: 12 })
+    const nearS = sWaves.reduce((b, sv) => Math.abs(sv.center - qw.center) < Math.abs(b.center - qw.center) ? sv : b, { center: 9999, sigma: 10 })
+    const nearT = tWaves.reduce((b, tv) => Math.abs(tv.center - qw.center) < Math.abs(b.center - qw.center) ? tv : b, { center: 9999, sigma: 20 })
+    const sOff = nearS.center < 9999 ? nearS.center + 2 * nearS.sigma : qOn + 80
+    const tOff = nearT.center < 9999 ? nearT.center + 2 * nearT.sigma : sOff + 130
+
+    if (nearP.center < 9999) {
+      const pOn  = nearP.center - 2 * nearP.sigma
+      const pOff = nearP.center + 2 * nearP.sigma
+      map.push({ id: 'sa',       onsetMs: pOn,       offsetMs: pOn + 40, state: 'active' })
+      map.push({ id: 'ra',       onsetMs: pOn + 10,  offsetMs: pOff,     state: 'active' })
+      map.push({ id: 'bachmann', onsetMs: pOn + 12,  offsetMs: pOn + 32, state: 'active' })
+      map.push({ id: 'la',       onsetMs: pOn + 25,  offsetMs: pOff,     state: 'active' })
+      map.push({ id: 'av',       onsetMs: pOff,      offsetMs: qOn,      state: avState })
+    }
+    map.push({ id: 'his',     onsetMs: qOn,       offsetMs: qOn + 20,  state: 'active' })
+    map.push({ id: 'rbundle', onsetMs: qOn + 10,  offsetMs: qOn + 45,  state: 'active' })
+    map.push({ id: 'lbundle', onsetMs: qOn + 10,  offsetMs: qOn + 45,  state: 'active' })
+    map.push({ id: 'rv',      onsetMs: qOn + 20,  offsetMs: sOff,      state: 'active' })
+    map.push({ id: 'lv',      onsetMs: qOn + 20,  offsetMs: sOff,      state: 'active' })
+    map.push({ id: 'apex',    onsetMs: qOn + 35,  offsetMs: sOff + 20, state: 'active' })
+    map.push({ id: 'repolLV', onsetMs: sOff + 60, offsetMs: tOff,      state: 'repol'  })
+    map.push({ id: 'repolRV', onsetMs: sOff + 60, offsetMs: tOff,      state: 'repol'  })
+    if (nearR.center < 9999) map.push({ id: '_rwave', onsetMs: nearR.center, offsetMs: nearR.center, rCenter: nearR.center, rSigma: nearR.sigma, state: 'meta' })
+  })
+  return map
+}
+
 // ─── Conduction map builder ──────────────────────────────────────────────────
 export function buildConductionMap(rhythmId, waves) {
   const w   = name => waves.find(wv => wv.name === name)
@@ -74,8 +122,15 @@ export function buildConductionMap(rhythmId, waves) {
   switch (rhythmId) {
     case 'normalSinus':
     case 'sinusTachycardia':
-    case 'sinusBradycardia':
-      return beatWindows(0)
+    case 'sinusBradycardia': {
+      // Physiology-driven waves aren't always a single beat (irregular/
+      // respiratory SA firing repeats the same beat 6 times over a longer
+      // cycle) — build one window set per real Q occurrence rather than
+      // anchoring everything to the first beat found. Falls back to the
+      // old single-beat helper if there's somehow no Q wave at all.
+      const series = buildBeatSeries(waves)
+      return series.length ? series : beatWindows(0)
+    }
 
     // Same entries as normalSinus, but atria/ventricles/repolarization carry
     // an extra `continuousWaves` descriptor so the frame loop derives their
@@ -123,14 +178,67 @@ export function buildConductionMap(rhythmId, waves) {
       return entries
     }
 
-    case 'firstDegreeBlock':
-      return beatWindows(0, { avState: 'delayed' })
+    case 'firstDegreeBlock': {
+      const series = buildBeatSeries(waves, { avState: 'delayed' })
+      return series.length ? series : beatWindows(0, { avState: 'delayed' })
+    }
 
-    case 'lbbb':
-      return beatWindows(0, { lbundleState: 'blocked', lvDelay: 60 })
+    // Fusion beat: buildFusionCycle overlaps a normal conducted beat with an
+    // ectopic-focus template (R/S/T only, no P/Q) at the same point in the
+    // cycle. The normal beats (each has its own Q) get the usual conduction
+    // sequence via buildBeatSeries; the ectopic contribution has no Q, so it
+    // shows up as an R wave with no nearby Q — animate that beat's
+    // ventricles with a distinct 'fusion' state instead of 'active' so the
+    // merged beat visibly reads as different from a normal one.
+    case 'fusion': {
+      const qWaves = waves.filter(wv => wv.name === 'Q')
+      const rWaves = waves.filter(wv => wv.name === 'R')
+      const sWaves = waves.filter(wv => wv.name === 'S')
+      const tWaves = waves.filter(wv => wv.name === 'T')
+      const map = buildBeatSeries(waves)
+      const orphanRs = rWaves.filter(rw => {
+        const nearestQDist = qWaves.reduce((best, qw) => Math.min(best, Math.abs(qw.center - rw.center)), Infinity)
+        return nearestQDist > 150
+      })
+      orphanRs.forEach(rw => {
+        const rOn  = rw.center - 2 * rw.sigma
+        const nearS = sWaves.reduce((b, sv) => Math.abs(sv.center - rw.center) < Math.abs(b.center - rw.center) ? sv : b, { center: 9999, sigma: 10 })
+        const nearT = tWaves.reduce((b, tv) => Math.abs(tv.center - rw.center) < Math.abs(b.center - rw.center) ? tv : b, { center: 9999, sigma: 20 })
+        const sOff = nearS.center < 9999 ? nearS.center + 2 * nearS.sigma : rOn + 60
+        const tOff = nearT.center < 9999 ? nearT.center + 2 * nearT.sigma : sOff + 130
+        map.push({ id: 'rv',      onsetMs: rOn,        offsetMs: sOff,      state: 'fusion' })
+        map.push({ id: 'lv',      onsetMs: rOn,        offsetMs: sOff,      state: 'fusion' })
+        map.push({ id: 'apex',    onsetMs: rOn + 15,   offsetMs: sOff + 20, state: 'fusion' })
+        map.push({ id: 'repolLV', onsetMs: sOff + 60,  offsetMs: tOff,      state: 'repol'  })
+        map.push({ id: 'repolRV', onsetMs: sOff + 60,  offsetMs: tOff,      state: 'repol'  })
+      })
+      return map
+    }
 
-    case 'rbbb':
-      return beatWindows(0, { rbundleState: 'blocked', rvDelay: 60 })
+    // Sine-wave hyperkalemia: QRS and T have merged into one indistinct
+    // blob (see applyIonEffects) — there is no organized SA→AV→His
+    // sequence left to show, so unlike the default fallback (which would
+    // fabricate a normal-looking beat from missing-wave defaults), show
+    // the ventricles as continuously chaotic instead of a false normal beat.
+    case 'vfib':
+      return ['ra', 'la', 'rv', 'lv', 'apex'].map(id => ({
+        id, onsetMs: 0, offsetMs: 9999, state: 'shimmer', shimmerFreq: 0.05, shimmerFreq2: 0.033,
+      }))
+
+    case 'lbbb': {
+      // The real QRS widens continuously with impairment severity
+      // (qrsDuration = 85 + maxImp*65 in ECGEngine.js) — derive the extra
+      // bundle-branch delay from that same widening (already reflected in
+      // the Q/S wave spacing) instead of a fixed step, so dragging the
+      // bundle-velocity slider produces a proportional change here too.
+      const bundleDelay = Math.max(0, Math.round((off('S') - on('Q') - 85) * 0.85))
+      return beatWindows(0, { lbundleState: 'blocked', lvDelay: bundleDelay })
+    }
+
+    case 'rbbb': {
+      const bundleDelay = Math.max(0, Math.round((off('S') - on('Q') - 85) * 0.85))
+      return beatWindows(0, { rbundleState: 'blocked', rvDelay: bundleDelay })
+    }
 
     case 'vtach':
       return beatWindows(0, { hideSA: true, hideAtria: true, hideAV: true, hideBundles: true, state: 'ectopic' })
@@ -147,21 +255,26 @@ export function buildConductionMap(rhythmId, waves) {
         map.push({ id: 'la',       onsetMs: pOn + 25,  offsetMs: pOff,     state: 'active' })
       })
       map.push({ id: 'av', onsetMs: 0, offsetMs: 9999, state: 'blocked' })
-      const qEsc = waves.find(wv => wv.name === 'Q')
-      if (qEsc) {
-        const qOn  = qEsc.center - 2 * qEsc.sigma
-        const sWave = waves.find(wv => wv.name === 'S')
-        const sOff  = sWave ? sWave.center + 2 * sWave.sigma : qOn + 80
-        const tWave = waves.find(wv => wv.name === 'T')
-        const tOff  = tWave ? tWave.center + 2 * tWave.sigma : sOff + 130
-        const rW    = waves.find(wv => wv.name === 'R')
-        map.push({ id: 'rv',      onsetMs: qOn + 15,  offsetMs: sOff,      state: 'active' })
-        map.push({ id: 'lv',      onsetMs: qOn + 15,  offsetMs: sOff,      state: 'active' })
-        map.push({ id: 'apex',    onsetMs: qOn + 30,  offsetMs: sOff + 20, state: 'active' })
-        map.push({ id: 'repolLV', onsetMs: sOff + 60, offsetMs: tOff,      state: 'repol'  })
-        map.push({ id: 'repolRV', onsetMs: sOff + 60, offsetMs: tOff,      state: 'repol'  })
-        if (rW) map.push({ id: '_rwave', onsetMs: rW.center, offsetMs: rW.center, rCenter: rW.center, rSigma: rW.sigma, state: 'meta' })
-      }
+      // Escape beats built by buildEscapeOrStandstill never include a Q wave
+      // (no discrete septal depolarization to show in a ventricular escape),
+      // so gate on R instead — and iterate every escape beat's R (there are
+      // normally 3 in a cycle), not just the first, so all of them animate.
+      const rWaves = waves.filter(wv => wv.name === 'R')
+      const sWaves = waves.filter(wv => wv.name === 'S')
+      const tWaves = waves.filter(wv => wv.name === 'T')
+      rWaves.forEach(rEsc => {
+        const rOn   = rEsc.center - 2 * rEsc.sigma
+        const nearS = sWaves.reduce((b, sv) => Math.abs(sv.center - rEsc.center) < Math.abs(b.center - rEsc.center) ? sv : b, { center: 9999, sigma: 10 })
+        const nearT = tWaves.reduce((b, tv) => Math.abs(tv.center - rEsc.center) < Math.abs(b.center - rEsc.center) ? tv : b, { center: 9999, sigma: 20 })
+        const sOff  = nearS.center < 9999 ? nearS.center + 2 * nearS.sigma : rOn + 80
+        const tOff  = nearT.center < 9999 ? nearT.center + 2 * nearT.sigma : sOff + 130
+        map.push({ id: 'rv',      onsetMs: rOn,        offsetMs: sOff,      state: 'active' })
+        map.push({ id: 'lv',      onsetMs: rOn,        offsetMs: sOff,      state: 'active' })
+        map.push({ id: 'apex',    onsetMs: rOn + 15,   offsetMs: sOff + 20, state: 'active' })
+        map.push({ id: 'repolLV', onsetMs: sOff + 60,  offsetMs: tOff,      state: 'repol'  })
+        map.push({ id: 'repolRV', onsetMs: sOff + 60,  offsetMs: tOff,      state: 'repol'  })
+        map.push({ id: '_rwave',  onsetMs: rEsc.center, offsetMs: rEsc.center, rCenter: rEsc.center, rSigma: rEsc.sigma, state: 'meta' })
+      })
       return map
     }
 
@@ -327,6 +440,10 @@ export function buildConductionMap(rhythmId, waves) {
       const sWaves = waves.filter(wv => wv.name === 'S')
       const tWaves = waves.filter(wv => wv.name === 'T')
       const avStates = ['active', 'delayed', 'blocked_flash']
+      // The physiology engine only ever produces a 2- or 3-beat group
+      // (conductionRatio 2 or 3) — derive the dropped-beat index from the
+      // actual P count instead of a literal sized for the old static preset.
+      const blockedIdx = pWaves.length - 1
       pWaves.forEach((pw, idx) => {
         const pOn  = pw.center - 2 * pw.sigma
         const pOff = pw.center + 2 * pw.sigma
@@ -338,7 +455,7 @@ export function buildConductionMap(rhythmId, waves) {
           if (qv.center < pw.center) return b
           return (b.center > pw.center && qv.center < b.center) ? qv : b
         }, { center: 9999, sigma: 8 })
-        if (nearQ.center < 9999 && idx < 3) {
+        if (nearQ.center < 9999 && idx < blockedIdx) {
           const qOn   = nearQ.center - 2 * nearQ.sigma
           const nearR = rWaves.reduce((b, rv) => Math.abs(rv.center - nearQ.center) < Math.abs(b.center - nearQ.center) ? rv : b, { center: 9999, sigma: 12 })
           const nearS = sWaves.reduce((b, sv) => Math.abs(sv.center - nearQ.center) < Math.abs(b.center - nearQ.center) ? sv : b, { center: 9999, sigma: 10 })
@@ -355,7 +472,7 @@ export function buildConductionMap(rhythmId, waves) {
           map.push({ id: 'repolLV', onsetMs: sOff + 60, offsetMs: tOff,      state: 'repol'  })
           map.push({ id: 'repolRV', onsetMs: sOff + 60, offsetMs: tOff,      state: 'repol'  })
           if (nearR.center < 9999) map.push({ id: '_rwave', onsetMs: nearR.center, offsetMs: nearR.center, rCenter: nearR.center, rSigma: nearR.sigma, state: 'meta' })
-        } else if (idx === 3) {
+        } else if (idx === blockedIdx) {
           map.push({ id: 'av', onsetMs: pOff, offsetMs: pOff + 200, state: 'blocked' })
         }
       })
@@ -369,6 +486,10 @@ export function buildConductionMap(rhythmId, waves) {
       const rWaves = waves.filter(wv => wv.name === 'R')
       const sWaves = waves.filter(wv => wv.name === 'S')
       const tWaves = waves.filter(wv => wv.name === 'T')
+      // Same reasoning as mobitzI above: derive from the actual P count
+      // (physiology engine only produces conductionRatio 2 or 3) rather
+      // than a literal sized for the old static preset.
+      const blockedIdx = pWaves.length - 1
       pWaves.forEach((pw, idx) => {
         const pOn  = pw.center - 2 * pw.sigma
         const pOff = pw.center + 2 * pw.sigma
@@ -380,7 +501,7 @@ export function buildConductionMap(rhythmId, waves) {
           if (qv.center < pw.center) return b
           return (b.center > pw.center && qv.center < b.center) ? qv : b
         }, { center: 9999, sigma: 8 })
-        if (nearQ.center < 9999 && idx < 2) {
+        if (nearQ.center < 9999 && idx < blockedIdx) {
           const qOn   = nearQ.center - 2 * nearQ.sigma
           const nearR = rWaves.reduce((b, rv) => Math.abs(rv.center - nearQ.center) < Math.abs(b.center - nearQ.center) ? rv : b, { center: 9999, sigma: 12 })
           const nearS = sWaves.reduce((b, sv) => Math.abs(sv.center - nearQ.center) < Math.abs(b.center - nearQ.center) ? sv : b, { center: 9999, sigma: 10 })
@@ -397,7 +518,7 @@ export function buildConductionMap(rhythmId, waves) {
           map.push({ id: 'repolLV', onsetMs: sOff + 60, offsetMs: tOff,      state: 'repol'  })
           map.push({ id: 'repolRV', onsetMs: sOff + 60, offsetMs: tOff,      state: 'repol'  })
           if (nearR.center < 9999) map.push({ id: '_rwave', onsetMs: nearR.center, offsetMs: nearR.center, rCenter: nearR.center, rSigma: nearR.sigma, state: 'meta' })
-        } else if (idx === 2) {
+        } else if (idx === blockedIdx) {
           map.push({ id: 'av', onsetMs: pOff, offsetMs: pOff + 200, state: 'blocked' })
         }
       })
@@ -443,6 +564,7 @@ const STATE_FILL = {
   blocked:       '#a855f7',  // purple — block
   blocked_flash: '#a855f7',  // purple — block flash
   ectopic:       '#818cf8',  // indigo — ectopic focus
+  fusion:        '#c026d3',  // fuchsia — blended normal + ectopic wavefronts
   shimmer:       '#eab308',  // yellow — fibrillatory shimmer
   repol:         '#1d4ed8',  // dark blue — repolarization
   hidden:        '#1e293b',
@@ -717,6 +839,7 @@ export default function HeartAnimation({ clockRef, rhythmId, rhythm, className =
 
           const fill   = STATE_FILL[entry.state] ?? STATE_FILL.active
           const filter = entry.state === 'ectopic' ? 'url(#ECG-glow-indigo)'
+                       : entry.state === 'fusion'  ? 'url(#ECG-glow-indigo)'
                        : entry.state === 'delayed' ? 'url(#ECG-glow-amber)'
                        : 'url(#ECG-glow)'
 

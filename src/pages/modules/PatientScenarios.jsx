@@ -64,6 +64,7 @@ const CASES = [
   {
     id: 'case1',
     title: 'Case 1',
+    priority: 'required',
     category: 'Atrial Fibrillation',
     rhythmId: 'atrialFibrillation',
     scaffolded: true,
@@ -83,7 +84,7 @@ const CASES = [
     questions: [
       {
         id: 'q1', type: 'mcq',
-        stem: 'What is the rhythm?',
+        stem: 'Which physiological change in the conduction system best explains this pattern?',
         options: ['Normal sinus rhythm', 'Atrial fibrillation', 'Atrial flutter (2:1)', 'Multifocal atrial tachycardia'],
         correct: 1,
       },
@@ -138,6 +139,7 @@ const CASES = [
   {
     id: 'case2',
     title: 'Case 2',
+    priority: 'required',
     category: '3rd-Degree AV Block',
     rhythmId: 'thirdDegreeBlock',
     scaffolded: false,
@@ -152,7 +154,7 @@ const CASES = [
     questions: [
       {
         id: 'q1', type: 'mcq',
-        stem: 'What is the rhythm?',
+        stem: 'Which physiological change in the conduction system best explains this pattern?',
         options: [
           'Sinus bradycardia with first-degree AV block',
           'Second-degree AV block, Mobitz Type II',
@@ -208,6 +210,7 @@ const CASES = [
   {
     id: 'case3',
     title: 'Case 3',
+    priority: 'extension',
     category: 'Mobitz II (2:1 Block)',
     rhythmId: 'mobitzII',
     scaffolded: false,
@@ -282,6 +285,7 @@ const CASES = [
   {
     id: 'case4',
     title: 'Case 4',
+    priority: 'extension',
     category: 'Sinus Arrhythmia',
     rhythmBuilder: buildSinusArrhythmia,
     scaffolded: false,
@@ -356,6 +360,7 @@ const CASES = [
   {
     id: 'case5',
     title: 'Case 5',
+    priority: 'extension',
     category: 'NSR with PVCs / R-on-T',
     rhythmId: 'pvcs',
     scaffolded: false,
@@ -430,6 +435,7 @@ const CASES = [
   {
     id: 'case6',
     title: 'Case 6',
+    priority: 'extension',
     category: 'Atrial Flutter (Variable Block)',
     rhythmBuilder: buildVariableFlutter,
     scaffolded: false,
@@ -497,6 +503,27 @@ const CASES = [
     explanation: `Atrial flutter is a macroreentrant arrhythmia — a single large reentrant circuit rotating around an anatomical obstacle, classically the tricuspid annulus in the right atrium (the cavotricuspid isthmus). The atria depolarize at a regular 250–350 bpm (typically ~300 bpm), producing the sawtooth or flutter wave pattern.\n\nThe AV node cannot safely conduct 300 impulses per minute to the ventricles. It acts as a physiological filter: most commonly conducting every other flutter wave (2:1 block → ventricular rate ~150 bpm). When conduction alternates between 2:1 and 3:1 — as in this patient — the ventricular response becomes irregular, superficially resembling atrial fibrillation. The diagnostic key is the organized sawtooth baseline at exactly 300 bpm, visible between QRS complexes.\n\nHyperthyroidism increases catecholamine sensitivity and shortens atrial refractory periods (thyroid hormone enhances If channels and adrenergic receptor expression in atrial myocytes). Shorter refractory periods allow reentrant circuits to complete a loop before the tissue ahead has recovered, sustaining flutter. Even treated Graves disease carries residual risk of atrial arrhythmias.\n\nAs you saw in Module 2A, the tricuspid annulus is a fixed anatomical structure in the right atrium — a natural obstacle around which a reentrant circuit can organize. The progressive dyspnea and crackles suggest this patient has developed rate-related diastolic dysfunction; restoring a normal ventricular rate through rate control or cardioversion is a clinical priority alongside anticoagulation given her prior PE.`,
   },
 ]
+
+// Priority signal only — does not hide or lock the extension cases.
+const PRIORITY_LABEL = {
+  required:  'Required',
+  extension: 'Extension — complete if time allows',
+}
+function PriorityBadge({ priority }) {
+  const label = PRIORITY_LABEL[priority]
+  if (!label) return null
+  const isRequired = priority === 'required'
+  return (
+    <span
+      className="inline-block text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded-full border shrink-0"
+      style={isRequired
+        ? { color: '#10b981', backgroundColor: '#10b98118', borderColor: '#10b98150' }
+        : { color: '#9ca3af', backgroundColor: '#37415130', borderColor: '#4b556380' }}
+    >
+      {label}
+    </span>
+  )
+}
 
 // ── ECG Strip renderer ────────────────────────────────────────────────────────
 function drawGrid(ctx, w, h) {
@@ -831,7 +858,10 @@ function ProgressDashboard({ scores, onSelectCase, activeId }) {
                 borderColor: isActive ? col : col + '50',
                 background:  isActive ? col + '18' : 'transparent',
               }}>
-              <p className="text-xs font-semibold text-white mb-0.5">{c.title}</p>
+              <div className="flex items-start justify-between gap-1 mb-0.5">
+                <p className="text-xs font-semibold text-white">{c.title}</p>
+                <PriorityBadge priority={c.priority} />
+              </div>
               <p className="text-xs text-gray-500 leading-snug mb-2" style={{ fontSize: '0.65rem' }}>
                 {c.category}
               </p>
@@ -891,6 +921,7 @@ export default function PatientScenarios() {
       moduleId="scenarios"
       number={4}
       title="Patient Scenarios"
+      description="Each case below presents a patient whose ECG reveals a change in their conduction system physiology. Your goal is not diagnosis — it is mechanism. For each case, identify which physiological property changed and explain why it produces the pattern you see."
     >
       <ProgressDashboard
         scores={scores}
@@ -900,8 +931,9 @@ export default function PatientScenarios() {
 
       <div className="mb-2 flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold text-white">
+          <h2 className="text-base font-semibold text-white flex items-center gap-2">
             {activeCase.title}: {activeCase.category}
+            <PriorityBadge priority={activeCase.priority} />
           </h2>
           {activeCase.scaffolded && (
             <p className="text-xs text-amber-400/70 mt-0.5">

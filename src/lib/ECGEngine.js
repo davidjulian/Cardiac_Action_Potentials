@@ -1406,7 +1406,10 @@ export function buildRhythmFromPhysiology(phys0) {
           // visible effect at all. High repolarization heterogeneity seeds
           // the same kind of re-entrant beat via a different mechanism; the
           // two triggers share this path but never double-stack (guarded
-          // above by `ventricularEctopicRate === 0`).
+          // above by `ventricularEctopicRate === 0`). Recorded as
+          // 'suppressed' either way so physiologyToRhythmId routes both
+          // triggers to the same (correct, multi-beat) HeartAnimation case.
+          derived.ectopicCapture = 'suppressed'
           const built = buildPVCsWaves({
             sinusRate: effectiveSaRate, multifocal: false,
             pAmplitude, pDuration, pAxis: 60, prInterval: prMs, ...baseQRS,
@@ -1445,6 +1448,18 @@ export function buildRhythmFromPhysiology(phys0) {
 
   result.waves = applyIonEffects(result.waves, potassiumMEqL, calciumMgDl, derived)
 
+  // QT/QRS were captured above before ion effects could shift the T wave
+  // (calcium) or widen the QRS complex (potassium) — re-derive them from the
+  // now-final waves so the displayed numbers track what's actually drawn.
+  // Skip when applyIonEffects has intentionally nulled them (QRS/T merged
+  // into one blob at severe hyperkalemia — no longer meaningfully
+  // measurable, so a re-derived number would just be a fabricated one).
+  if (derived.qtIntervalMs !== null) {
+    const remeasured = measureIntervals(result.waves)
+    if (remeasured.qtIntervalMs  != null) derived.qtIntervalMs  = remeasured.qtIntervalMs
+    if (remeasured.qrsDurationMs != null) derived.qrsDurationMs = remeasured.qrsDurationMs
+  }
+
   derived.ventricularRateBpm = result.heartRateBpm ?? 0
   result.derived = derived
   return result
@@ -1464,7 +1479,9 @@ export function physiologyToRhythmId(derived) {
   // AND severe/high-grade block (finite avRatio>=4, routed to the same
   // builder since Mobitz I/II's wave structure wouldn't match there).
   if (derived.escapeSource !== undefined) return 'thirdDegreeBlock'
-  if (derived.ectopicCapture === 'captured') return 'vtach'
+  if (derived.ectopicCapture === 'captured')  return 'vtach'
+  if (derived.ectopicCapture === 'fusion')    return 'fusion'
+  if (derived.ectopicCapture === 'suppressed') return 'pvcs'
   if (derived.avRatio > 1) return derived.avRecoveryBehavior === 'fatigue' ? 'mobitzI' : 'mobitzII'
   if (derived.leftImpairment >= 0.5 && derived.leftImpairment >= derived.rightImpairment) return 'lbbb'
   if (derived.rightImpairment >= 0.5 && derived.rightImpairment > derived.leftImpairment) return 'rbbb'
