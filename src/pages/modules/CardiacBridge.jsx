@@ -835,7 +835,7 @@ const PK_ION_CHANNELS = [
   { id: 'ICaL', label: 'ICa-L', note: 'L-type Ca²⁺ — the longest plateau of any cardiac cell', levels: { p4r: 0, p0: 0.20, p1: 0.40, p2: 1,  p3: 0.25, p4d: 0 } },
   { id: 'IKr',  label: 'IKr',  note: 'Rapid delayed rectifier', levels: { p4r: 0, p0: 0, p1: 0.10, p2: 0.45, p3: 1,    p4d: 0.10 } },
   { id: 'IKs',  label: 'IKs',  note: 'Slow delayed rectifier', levels: { p4r: 0, p0: 0, p1: 0.05, p2: 0.35, p3: 0.90, p4d: 0.10 } },
-  { id: 'If',   label: 'If (slow)', note: 'Slight automaticity — backup pacemaker if SA/AV both fail', levels: { p4r: 0.05, p0: 0, p1: 0, p2: 0, p3: 0, p4d: 0.35 } },
+  { id: 'If',   label: 'If', note: 'Slow If supports slight automaticity — backup pacemaker if SA/AV both fail', levels: { p4r: 0.05, p0: 0, p1: 0, p2: 0, p3: 0, p4d: 0.35 } },
 ]
 const ATRIAL_ION_CHANNELS = [
   { id: 'INa',  label: 'INa',  note: 'Fast Na⁺ — snaps open at Phase 0', levels: { p4r: 0,    p0: 1,    p1: 0.05, p2: 0,    p3: 0,    p4d: 0 } },
@@ -924,14 +924,17 @@ function IonChannelRow({ clockRef, cycleMs, phases, channels }) {
   }, [clockRef, cycleMs, channels])
 
   return (
-    <div className="flex flex-wrap gap-1 px-3 py-1.5 border-t border-gray-800/70 bg-gray-950/40">
+    <div
+      className="grid gap-1 px-2 py-1.5 border-t border-gray-800/70 bg-gray-950/40"
+      style={{ gridTemplateColumns: `repeat(${channels.length}, minmax(0, 1fr))` }}
+    >
       {channels.map(ch => (
-        <div key={ch.id} className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-gray-600/80" title={ch.note}>
+        <div key={ch.id} className="flex min-w-0 items-center justify-center gap-1 rounded-md border border-gray-600/80 px-1 py-1" title={ch.note}>
           <span
             ref={el => { elRefs.current[ch.id] = el }}
-            className="w-2 h-2 rounded-full bg-gray-600 transition-all duration-150"
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-gray-600 transition-all duration-150"
           />
-          <span className="text-xs font-mono font-medium text-gray-100">{ch.label}</span>
+          <span className="whitespace-nowrap font-mono text-[10px] font-semibold leading-none text-gray-100">{ch.label}</span>
         </div>
       ))}
     </div>
@@ -1259,9 +1262,17 @@ function LiveActionPotentials() {
         excitation to ventricular myocytes.
       </p>
 
-      <div className={lessonView === 'experiment' ? 'xl:grid xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-3' : ''}>
+      <div className={lessonView === 'experiment' ? 'xl:grid xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-3' : ''}>
         <div className="min-w-0">
-          <div className={`grid grid-cols-1 gap-2 items-stretch ${lessonView === 'compare' && visiblePanels.length > 1 ? 'xl:grid-cols-2' : ''}`}>
+          <div className={`grid grid-cols-1 gap-2 items-stretch ${
+            visiblePanels.length > 1
+              ? lessonView === 'compare'
+                ? visiblePanels.length === 2
+                  ? 'md:grid-cols-2'
+                  : 'md:grid-cols-2 xl:grid-cols-3'
+                : 'xl:grid-cols-2'
+              : ''
+          }`}>
             {visiblePanels.map(option => (
               <APLivePanel
                 key={option.id}
