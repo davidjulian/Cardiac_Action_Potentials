@@ -959,7 +959,7 @@ function PhaseLabel({ clockRef, cycleMs, phases }) {
     rafId = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(rafId)
   }, [clockRef, cycleMs])
-  return <p ref={ref} className="text-xs text-cyan-200 font-mono px-3 pt-1 min-h-[18px] leading-snug" />
+  return <p ref={ref} className="min-h-10 px-3 pt-1 font-mono text-xs leading-snug text-cyan-200" />
 }
 
 // One live panel = trace (TraceCanvas) + optional phase-number bands +
