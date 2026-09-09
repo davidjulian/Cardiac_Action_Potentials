@@ -12,7 +12,11 @@ The ventricular and atrial models represent:
 - Phase 2: inward `ICa-L` balanced by outward potassium current
 - Phase 3: repolarization dominated by `IKr` and `IKs`
 
-The nodal model represents an `If` and `ICa-T` dependent phase 4, an `ICa-L` dependent upstroke, and potassium dependent repolarization.
+The nodal model represents an `If` and `ICa-T` dependent phase 4, an `ICa-L` dependent upstroke, and potassium dependent repolarization. Extracellular potassium shifts the SA node maximum diastolic potential in the same direction that it shifts potassium equilibrium potential.
+
+Displayed activation follows this sequence: SA node, atrial myocardium, AV node, His bundle, bundle branches, Purkinje fibers, and ventricular myocytes. Traces are shown only for the SA node, atrial myocytes, Purkinje fibers, and ventricular myocytes.
+
+Channel indicators group the underlying qualitative activity values into three teaching categories: minimal, contributing, and dominant. They indicate relative current contribution, not measured open probability or conductance.
 
 ## Calcium transient
 

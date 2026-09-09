@@ -566,8 +566,9 @@ function computeAPPhysiology({ sympathetic, parasympathetic, kMEqL, caMgDl }) {
   const cycleMs = 60000 / saRate
 
   // ── SA node shape ──
+  const saKShift = kDev >= 0 ? 3.0 * kDev : 1.5 * kDev
   const sa = {
-    mdp: clamp(-60 + 5 * symp - 10 * para, -78, -50),
+    mdp: clamp(-60 + 5 * symp - 10 * para + saKShift, -78, -45),
     phase4Frac: clamp(0.68 - 0.24 * symp + 0.14 * para, 0.34, 0.86),
     threshold: -40,
   }
@@ -645,19 +646,18 @@ function buildSAWave({ mdp, phase4Frac, threshold }, n = 60) {
   return { data, phases }
 }
 
-// kind: 'ventricle' | 'purkinje' | 'atrium'. p0Start is deliberately earlier
-// for the atrium than for ventricle/Purkinje — real conduction reaches the
-// atrial myocardium almost immediately after SA firing, while ventricle/
-// Purkinje only fire after the AV delay, later in the shared cycle. That
-// ordering (SA → atrium → [AV delay] → ventricle/Purkinje) is what makes
-// "SA fires first" actually legible across all four panels at once.
+// kind: 'ventricle' | 'purkinje' | 'atrium'. The displayed working-cell
+// upstrokes follow the physiological sequence: atrial myocardium first,
+// then Purkinje fibers after the AV/His/bundle pathway, then ventricular
+// myocardium. Intermediate conduction tissues are named in the pathway
+// ribbon rather than given redundant traces.
 function buildWorkingCellWave({ restingMv, upstrokePeak, upstrokeSlowFactor, plateauScale, repolSlowFactor, uWaveMv }, kind, n = 100) {
   const isPurkinje = kind === 'purkinje'
   const isAtrium   = kind === 'atrium'
   const cellRestingMv = isAtrium ? clamp(restingMv + 10, -100, -45) : restingMv // atrium's baseline is less negative (~ -80 vs -90)
   const notchMv = cellRestingMv + (upstrokePeak - cellRestingMv) * 0.55
   const plateauMv = isPurkinje ? 4 : isAtrium ? 0 : 2
-  const p0Start = isAtrium ? 0.05 : 0.182
+  const p0Start = isAtrium ? 0.05 : isPurkinje ? 0.165 : 0.195
   const p0End = p0Start + (isPurkinje ? 0.021 : isAtrium ? 0.020 : 0.025) * upstrokeSlowFactor
   const p1End = p0End + 0.020
   const basePlateauDur = isPurkinje ? 0.315 : isAtrium ? 0.13 : 0.255
@@ -830,7 +830,14 @@ const ION_CHANNEL_GLOSSARY = [
 function IonChannelGlossary() {
   return (
     <div className="mt-2 rounded-xl border border-gray-800 bg-gray-900/60 p-2.5">
-      <h3 className="text-xs font-semibold text-gray-300 mb-1.5">Ion channel key</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+        <h3 className="text-xs font-semibold text-gray-300">Ion channel key</h3>
+        <div className="flex items-center gap-3 text-[10px] text-gray-400" aria-label="Current contribution color key">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-600" />Minimal</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-cyan-400" />Contributing</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" />Dominant</span>
+        </div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-1">
         {ION_CHANNEL_GLOSSARY.map(ch => (
           <div key={ch.id} className="flex items-baseline gap-2 text-xs">
@@ -863,9 +870,13 @@ function IonChannelRow({ clockRef, cycleMs, phases, channels }) {
         const el = elRefs.current[ch.id]
         if (!el) return
         const level = phase ? (ch.levels[phase.id] ?? 0) : 0
-        el.style.opacity = String(0.18 + 0.82 * level)
-        el.style.transform = `scale(${(1 + 0.35 * level).toFixed(2)})`
-        el.style.boxShadow = level > 0.5 ? `0 0 ${Math.round(6 * level)}px #fbbf24` : 'none'
+        const state = level < 0.2 ? 'Minimal' : level < 0.7 ? 'Contributing' : 'Dominant'
+        const stateColor = state === 'Minimal' ? '#4b5563' : state === 'Contributing' ? '#22d3ee' : '#fbbf24'
+        el.style.backgroundColor = stateColor
+        el.style.opacity = '1'
+        el.style.transform = `scale(${state === 'Dominant' ? '1.22' : state === 'Contributing' ? '1.10' : '1'})`
+        el.style.boxShadow = state === 'Dominant' ? '0 0 6px #fbbf24' : state === 'Contributing' ? '0 0 3px #22d3ee' : 'none'
+        el.setAttribute('aria-label', `${ch.label}: ${state.toLowerCase()} current contribution`)
       })
       rafId = requestAnimationFrame(frame)
     }
@@ -879,7 +890,7 @@ function IonChannelRow({ clockRef, cycleMs, phases, channels }) {
         <div key={ch.id} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-gray-700/60" title={ch.note}>
           <span
             ref={el => { elRefs.current[ch.id] = el }}
-            className="w-2 h-2 rounded-full bg-amber-400 transition-transform duration-150"
+            className="w-2 h-2 rounded-full bg-gray-600 transition-all duration-150"
           />
           <span className="text-[10px] font-mono text-gray-300">{ch.label}</span>
         </div>
@@ -1021,7 +1032,42 @@ function kBarColor(k) {
 
 const SPEEDS = [0.25, 0.5, 1]
 
+const CONDUCTION_PATHWAY = [
+  { label: 'SA node', shown: true },
+  { label: 'Atrial myocardium', shown: true },
+  { label: 'AV node', shown: false },
+  { label: 'His bundle', shown: false },
+  { label: 'Bundle branches', shown: false },
+  { label: 'Purkinje fibers', shown: true },
+  { label: 'Ventricular myocytes', shown: true },
+]
+
+function ConductionPathway() {
+  return (
+    <div className="mb-2 rounded-xl border border-gray-800 bg-gray-900/60 px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-1.5" aria-label="Normal cardiac conduction sequence">
+        {CONDUCTION_PATHWAY.map((item, index) => (
+          <span key={item.label} className="contents">
+            <span className={`rounded-md border px-2 py-1 text-[10px] font-medium ${
+              item.shown
+                ? 'border-emerald-700/60 bg-emerald-950/50 text-emerald-300'
+                : 'border-gray-700 bg-gray-950/50 text-gray-400'
+            }`}>
+              {item.label}
+            </span>
+            {index < CONDUCTION_PATHWAY.length - 1 && <span className="text-gray-600" aria-hidden="true">→</span>}
+          </span>
+        ))}
+      </div>
+      <p className="mt-1.5 text-[10px] leading-relaxed text-gray-500">
+        Green structures have traces below. AV node, His bundle, and bundle branches remain in the pathway even though separate traces are not shown.
+      </p>
+    </div>
+  )
+}
+
 function LiveActionPotentials() {
+  const [lessonView, setLessonView] = useState('compare')
   const [sympathetic, setSympathetic] = useState(20)
   const [parasympathetic, setParasympathetic] = useState(20)
   const [kMEqL, setKMEqL] = useState(4.0)
@@ -1051,42 +1097,76 @@ function LiveActionPotentials() {
 
   return (
     <div>
-      {/* Four synchronized live panels, in conduction order: SA fires first,
-          then the atrium (almost immediately), then — after the AV delay —
-          ventricle and Purkinje fire together. */}
-      <p className="text-[11px] text-gray-500 mb-1">
-        The cursor loops once per cardiac cycle. Watch the order: SA node fires first, the atrium follows almost
-        immediately, then ventricle and Purkinje fire together after the AV delay.
-      </p>
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-2 items-stretch">
-        <APLivePanel
-          clockRef={clockRef} cycleMs={phys.cycleMs}
-          title="SA Node — Automaticity" sub="(no external stimulus needed) — fires first"
-          data={sa.data} phases={sa.phases} channels={SA_ION_CHANNELS}
-          color="#34d399" showPhaseNumbers={false}
-        />
-        <APLivePanel
-          clockRef={clockRef} cycleMs={phys.cycleMs}
-          title="Atrial Myocyte" sub="Fires just after SA — brief plateau"
-          data={atr.data} phases={atr.phases} channels={ATRIAL_ION_CHANNELS}
-          color="#fbbf24" showPhaseNumbers={false} mechanics={atrialMechanics}
-        />
-        <APLivePanel
-          clockRef={clockRef} cycleMs={phys.cycleMs}
-          title="Ventricular Myocyte" sub="Working myocardium (Phases 0–4) — fires after the AV delay"
-          data={myo.data} phases={myo.phases} channels={MYO_ION_CHANNELS}
-          color="#60a5fa" showPhaseNumbers mechanics={ventricularMechanics}
-        />
-        <APLivePanel
-          clockRef={clockRef} cycleMs={phys.cycleMs}
-          title="Purkinje Fiber" sub="Fastest conduction, longest plateau"
-          data={pk.data} phases={pk.phases} channels={PK_ION_CHANNELS}
-          color="#a78bfa" showPhaseNumbers={false}
-        />
+      <div className="mb-2 flex flex-wrap gap-2" role="tablist" aria-label="Action potential learning stages">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={lessonView === 'compare'}
+          onClick={() => setLessonView('compare')}
+          className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+            lessonView === 'compare'
+              ? 'border-emerald-700/60 bg-emerald-950/60 text-emerald-300'
+              : 'border-gray-700 bg-gray-900 text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          1 · Compare cell types
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={lessonView === 'experiment'}
+          onClick={() => setLessonView('experiment')}
+          className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+            lessonView === 'experiment'
+              ? 'border-emerald-700/60 bg-emerald-950/60 text-emerald-300'
+              : 'border-gray-700 bg-gray-900 text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          2 · Run experiments
+        </button>
       </div>
-      <IonChannelGlossary />
 
-      {/* Playback controls — one clock drives all three panels */}
+      <ConductionPathway />
+      <p className="text-[11px] text-gray-500 mb-1.5">
+        The shared cursor reveals sequence as well as shape. Purkinje fibers depolarize after conduction through the
+        AV node, His bundle, and bundle branches, then rapidly deliver excitation to ventricular myocytes.
+      </p>
+
+      <div className={lessonView === 'experiment' ? 'xl:grid xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-3' : ''}>
+        <div className="min-w-0">
+          <div className={`grid grid-cols-1 gap-2 items-stretch ${lessonView === 'compare' ? 'xl:grid-cols-2' : ''}`}>
+            <APLivePanel
+              clockRef={clockRef} cycleMs={phys.cycleMs}
+              title="SA Node — Automaticity"
+              sub={`Fires first · maximum diastolic potential ${phys.sa.mdp.toFixed(1)} mV · ${Math.round(phys.saRate)} bpm`}
+              data={sa.data} phases={sa.phases} channels={SA_ION_CHANNELS}
+              color="#34d399" showPhaseNumbers={false}
+            />
+            <APLivePanel
+              clockRef={clockRef} cycleMs={phys.cycleMs}
+              title="Atrial Myocyte" sub="Depolarizes shortly after the SA node · brief plateau"
+              data={atr.data} phases={atr.phases} channels={ATRIAL_ION_CHANNELS}
+              color="#fbbf24" showPhaseNumbers={false} mechanics={atrialMechanics}
+            />
+            <APLivePanel
+              clockRef={clockRef} cycleMs={phys.cycleMs}
+              title="Purkinje Fiber" sub="Depolarizes before ventricular myocytes · fastest conduction"
+              data={pk.data} phases={pk.phases} channels={PK_ION_CHANNELS}
+              color="#a78bfa" showPhaseNumbers={false}
+            />
+            <APLivePanel
+              clockRef={clockRef} cycleMs={phys.cycleMs}
+              title="Ventricular Myocyte" sub="Activated by the Purkinje network · working myocardium"
+              data={myo.data} phases={myo.phases} channels={MYO_ION_CHANNELS}
+              color="#60a5fa" showPhaseNumbers mechanics={ventricularMechanics}
+            />
+          </div>
+          <IonChannelGlossary />
+        </div>
+
+        <div className={lessonView === 'experiment' ? 'xl:sticky xl:top-3 xl:self-start' : ''}>
+
+      {/* Playback controls — one clock drives all four panels */}
       <div className="flex items-center gap-3 flex-wrap mt-2 rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-2">
         <button
           onClick={toggle}
@@ -1099,6 +1179,7 @@ function LiveActionPotentials() {
           min={0} max={phys.cycleMs}
           value={Math.min(Math.max(tMs, 0), phys.cycleMs)}
           onChange={e => scrub(Number(e.target.value))}
+          aria-label="Cardiac cycle time"
           className="flex-1 min-w-[120px] accent-emerald-500"
         />
         <span className="text-xs font-mono text-gray-500 tabular-nums w-28">{Math.round(tMs)} / {Math.round(phys.cycleMs)} ms</span>
@@ -1131,10 +1212,12 @@ function LiveActionPotentials() {
         </button>
       </div>
 
+      {lessonView === 'experiment' && (
+        <>
       {/* ── ANS controls ── */}
       <div className="mt-2 rounded-xl border border-gray-800 bg-gray-900/60 p-3">
         <h3 className="text-sm font-semibold text-white mb-1.5">Autonomic Nervous System</h3>
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col gap-3">
           <LabeledSlider
             label="Sympathetic Tone" value={sympathetic} min={0} max={100}
             onChange={setSympathetic} unit="%" accent="accent-red-500"
@@ -1144,7 +1227,7 @@ function LiveActionPotentials() {
             onChange={setParasympathetic} unit="%" accent="accent-blue-500"
           />
         </div>
-        <div className="grid sm:grid-cols-2 gap-2 mt-2">
+        <div className="grid grid-cols-1 gap-2 mt-2">
           <Callout>
             <strong>Sympathetic (β1 adrenergic):</strong> Noradrenaline / adrenaline → β1 receptor → ↑ If, ↑ ICa-L.
             SA node Phase 4 slope steepens (faster automaticity) and cycle shortens; max diastolic potential becomes
@@ -1172,7 +1255,7 @@ function LiveActionPotentials() {
       {/* ── Ion concentration controls ── */}
       <div className="mt-2 rounded-xl border border-gray-800 bg-gray-900/60 p-3">
         <h3 className="text-sm font-semibold text-white mb-1.5">Extracellular Ion Concentrations</h3>
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col gap-3">
           <div className="flex-1 min-w-[220px]">
             <LabeledSlider
               label="Extracellular [K⁺]" value={kMEqL} min={2.0} max={9.0} step={0.1}
@@ -1191,17 +1274,18 @@ function LiveActionPotentials() {
           />
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-2 mt-2">
+        <div className="grid grid-cols-1 gap-2 mt-2">
           {kMEqL > 5.5 ? (
             <Callout>
-              ↑ [K⁺]out shifts EK toward 0, so resting Vm becomes less negative. Persistent depolarization leaves
-              fewer fast Na⁺ channels available, reducing AP amplitude and slowing the Phase 0 upstroke.
+              ↑ [K⁺]out shifts EK toward 0, making maximum diastolic potential in the SA node and resting Vm in
+              working cells less negative. Persistent depolarization also reduces fast Na⁺ channel availability in
+              atrial, Purkinje, and ventricular cells.
             </Callout>
           ) : kMEqL < 3.5 ? (
             <Callout>
-              ↓ [K⁺]out shifts EK more negative and makes resting Vm more negative. Repolarization can still slow
-              as conductance through repolarizing K⁺ channels, especially IKr, falls. A small U wave analog appears
-              after ventricular Phase 3.
+              ↓ [K⁺]out shifts EK more negative, making SA node maximum diastolic potential and working-cell resting
+              Vm more negative. Repolarization can still slow as conductance through repolarizing K⁺ channels,
+              especially IKr, falls. A small U wave analog appears after ventricular Phase 3.
             </Callout>
           ) : (
             <Callout>Extracellular [K⁺] is within the normal 3.5–5.0 mEq/L range — resting potential and repolarization are unaffected.</Callout>
@@ -1227,6 +1311,10 @@ function LiveActionPotentials() {
           </div>
         )}
       </div>
+        </>
+      )}
+        </div>
+      </div>
 
       {/* Intracellular and mechanical teaching signals only */}
       <p className="mt-2 text-[11px] text-gray-600 text-center leading-relaxed">
@@ -1249,8 +1337,13 @@ function useLocalClock(cycleMs, nativeCycleMs = null, speed = 1) {
   const [isPlaying, setIsPlaying] = useState(true)
 
   useEffect(() => {
+    const previousCycleMs = clockRef.current.cycleMs
+    const phaseFraction = previousCycleMs > 0 ? clockRef.current.tInCycle / previousCycleMs : 0
+    const adjustedTime = clamp(phaseFraction * cycleMs, 0, cycleMs)
+    clockRef.current.tInCycle = adjustedTime
     clockRef.current.cycleMs = cycleMs
     clockRef.current.nativeCycleMs = nativeCycleMs
+    setTMs(Math.round(adjustedTime))
   }, [cycleMs, nativeCycleMs])
 
   useEffect(() => {
@@ -2465,7 +2558,7 @@ export default function CardiacBridge() {
         <Section
           label="2B"
           title="Action Potentials by Cell Type"
-          subtitle="Three fundamentally different action potential shapes — each explained by different ion channel composition. Hover any phase region to see which channels are open and what they do."
+          subtitle="Compare action potential shapes, follow their activation sequence, and use channel contributions to predict how each cell will respond."
         >
           <LiveActionPotentials />
           <Callout>
