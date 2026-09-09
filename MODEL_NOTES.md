@@ -46,6 +46,14 @@ Fpeak = Cpeak^n / (Kd^n + Cpeak^n)
 
 The ventricular baseline is normalized to 100%. The force waveform begins after the calcium transient and uses slower activation and decay constants. Atrial calcium and force transients are smaller and shorter than ventricular transients.
 
+## Conduction animation
+
+The 2D animation is an anatomically guided teaching schematic. It represents the sequence from SA node initiation through atrial activation, AV nodal delay, His bundle activation, bundle branch and Purkinje activation, ventricular myocardial activation, and regional recovery.
+
+Curved paths represent specialized conduction tissue. Atrial activation expands from the SA node, while several ventricular fronts originate near the endocardial Purkinje network rather than moving as one planar wave. Repolarization is deliberately shown as soft, offset regions because activation time and action potential duration both influence recovery.
+
+Screen distance, front location, and elapsed animation time are not a quantitative activation map. Conduction velocities are displayed separately as reference ranges.
+
 ## Important limitations
 
 - The model does not calculate individual ionic currents from channel gating equations.

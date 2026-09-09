@@ -1,7 +1,9 @@
 ﻿import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import p5 from 'p5'
 import ModulePage from '../../components/ModulePage'
-import HeartAnimation, { buildConductionMap } from '../../components/HeartAnimation'
+import TeachingConductionAnimation from '../../components/TeachingConductionAnimation'
+import { getTeachingConductionStage } from '../../lib/teachingConduction'
+import HeartAnimation from '../../components/HeartAnimation'
 import { ECGVoltage, cycleVoltage, buildRhythmFromParams, meanQRSAxis } from '../../lib/ECGEngine'
 import { AxisSummaryPanel } from '../../components/MeanAxisPanel'
 import { useTabState, usePublishTabs } from '../../components/ModuleTabs'
@@ -1964,22 +1966,6 @@ function ECGVsAPSection({ rhythm }) {
 }
 
 // ── 2D: Conduction Animation ────────────────────────────────────────────────
-const STRUCT_LAB_NOTE = {
-  sa: 'The SA node initiates each normal cycle through spontaneous Phase 4 depolarization.',
-  ra: 'Right atrial myocardium conducts the wavefront away from the SA node at about 1 m/s.',
-  la: "The left atrium activates through Bachmann's bundle shortly after the right atrium.",
-  bachmann: "Bachmann's bundle carries excitation from the right atrium to the left atrium.",
-  av: 'The AV node conducts slowly, creating time for atrial contraction and ventricular filling.',
-  his: 'The Bundle of His carries excitation through the electrically insulating fibrous skeleton.',
-  rbundle: 'The right bundle branch rapidly delivers excitation toward the right ventricular endocardium.',
-  lbundle: 'The left bundle branch rapidly delivers excitation toward the left ventricular endocardium.',
-  rv: 'Right ventricular myocardium activates from endocardium toward epicardium.',
-  lv: 'Left ventricular myocardium activates from endocardium toward epicardium.',
-  apex: 'The Purkinje network distributes excitation rapidly across the ventricular endocardium.',
-  repolLV: 'Left ventricular myocardium is returning toward its resting membrane potential.',
-  repolRV: 'Right ventricular myocardium is returning toward its resting membrane potential.',
-}
-
 // Owns its own clock now that 2D is a standalone tab, never mounted
 // alongside 2E — they used to share one master clock via props from the
 // top-level CardiacBridge component; now each tab gets its own via the
@@ -1987,23 +1973,15 @@ const STRUCT_LAB_NOTE = {
 function ConductionSection({ rhythm }) {
   const cycleMs = rhythm.cycleMs || CYCLE_MS
   const { clockRef, tMs, isPlaying, toggle, scrub } = useLocalClock(cycleMs, rhythm.nativeCycleMs ?? null)
-  const conductionMap = useMemo(() => buildConductionMap('normalSinus', rhythm.waves), [rhythm.waves])
-
-  const { structName, cv, note } = useMemo(() => {
-    if (!conductionMap || conductionMap.length === 0)
-      return { structName: 'Diastole', cv: '—', note: '' }
-    for (const e of conductionMap) {
-      if (tMs >= e.onsetMs && tMs < e.offsetMs && e.state !== 'meta') {
-        const id = e.id
-        return {
-          structName: STRUCT_NAMES[id] || id,
-          cv: STRUCT_CV[id] || '—',
-          note: STRUCT_LAB_NOTE[id] || '',
-        }
-      }
-    }
-    return { structName: 'Diastole (rest)', cv: '—', note: 'Heart muscle at rest. SA node building toward next pacemaker potential.' }
-  }, [conductionMap, tMs])
+  const stage = getTeachingConductionStage(tMs, cycleMs)
+  const activeVelocityRows = {
+    sa: ['SA Node'],
+    atria: ['Atrial myocardium'],
+    av: ['AV Node'],
+    his: ['Bundle of His'],
+    purkinje: ['Bundle Branches', 'Purkinje Fibers'],
+    ventricles: ['Ventricular muscle'],
+  }[stage.id] || []
 
   const velTable = [
     { struct: 'SA Node',             cv: '—' },
@@ -2017,46 +1995,43 @@ function ConductionSection({ rhythm }) {
 
   return (
     <div>
-      <div className="flex gap-4 items-start mb-4">
-        {/* Heart animation */}
-        <div className="relative rounded-xl border border-gray-800 overflow-hidden shrink-0">
-          <HeartAnimation
-            clockRef={clockRef}
-            rhythmId="normalSinusVoltage"
-            rhythm={rhythm}
-          />
+      <div className="flex flex-col xl:flex-row gap-4 items-start mb-4">
+        <div className="relative rounded-xl border border-gray-800 overflow-hidden shrink-0 max-w-full">
+          <TeachingConductionAnimation timeMs={tMs} cycleMs={cycleMs} />
         </div>
 
-        {/* Side panel */}
-        <div className="flex-1 space-y-3">
-          <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-4 min-h-[120px]">
-            <div className="text-xs text-cyan-400 mb-2">Active Structure</div>
-            <div className="text-sm font-semibold text-white mb-2 min-h-[20px]">{structName}</div>
-            <InfoRow label="Conduction vel." value={cv} />
-            <div className="mt-2 min-h-[48px]">
-              <p className="text-xs text-gray-400 leading-relaxed">{note || ' '}</p>
+        <div className="flex-1 min-w-0 space-y-3">
+          <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-4 min-h-[166px]">
+            <div className="text-[10px] uppercase tracking-wider text-cyan-400 mb-1">Current stage</div>
+            <div className="text-lg font-semibold text-white min-h-[28px]">{stage.label}</div>
+            <div className="mt-3 text-[10px] uppercase tracking-wider text-gray-500">Participating structures</div>
+            <div className="mt-1 text-sm text-emerald-300 min-h-[20px]">{stage.structures}</div>
+            <div className="mt-3 min-h-[44px]">
+              <p className="text-xs text-gray-400 leading-relaxed">{stage.note}</p>
             </div>
           </div>
 
-          {/* Velocity table */}
           <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-3">
-            <div className="text-xs text-gray-500 mb-2 font-mono uppercase tracking-wider">Conduction Velocity Reference</div>
+            <div className="text-xs text-gray-500 mb-2 font-mono uppercase tracking-wider">Conduction velocity reference</div>
             <table className="w-full text-xs">
               <tbody>
                 {velTable.map(row => (
-                  <tr key={row.struct} className={structName === row.struct ? 'text-cyan-300' : 'text-gray-400'}>
+                  <tr key={row.struct} className={activeVelocityRows.includes(row.struct) ? 'text-cyan-300' : 'text-gray-400'}>
                     <td className="py-0.5 pr-3">{row.struct}</td>
                     <td className="py-0.5 font-mono text-right">{row.cv}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <p className="mt-2 border-t border-gray-800 pt-2 text-[10px] leading-relaxed text-gray-600">
+              Reference ranges describe tissue conduction. Pixel distance and animation speed do not represent measured velocity.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-3">
+        <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={toggle}
           className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-white transition-colors"
@@ -2075,15 +2050,38 @@ function ConductionSection({ rhythm }) {
         >
           Reset
         </button>
+          <span className="ml-auto text-xs font-mono text-gray-500 tabular-nums">{Math.round(tMs)} / {Math.round(cycleMs)} ms</span>
+        </div>
+
+        <div className="mt-3">
         <input
           type="range"
           min={0}
           max={cycleMs}
           value={Math.round(tMs)}
           onChange={e => scrub(Number(e.target.value))}
-          className="flex-1 min-w-[120px] accent-cyan-500"
+            aria-label="Cardiac conduction sequence time"
+            className="w-full accent-cyan-500"
         />
-        <span className="text-xs font-mono text-gray-500 tabular-nums w-20">{tMs} / {cycleMs} ms</span>
+          <div className="relative mt-1 hidden h-7 text-[9px] leading-tight text-gray-500 sm:block">
+            {[
+              ['Atrial activation', '11.8%'],
+              ['AV delay', '26%'],
+              ['His–Purkinje', '41.5%'],
+              ['Ventricular activation', '57.5%'],
+              ['Repolarization', '78%'],
+            ].map(([label, left]) => (
+              <span key={label} className="absolute w-28 -translate-x-1/2 text-center" style={{ left }}>
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-lg border border-amber-700/35 bg-amber-950/20 px-3 py-2 text-[11px] leading-relaxed text-amber-200/90">
+        <strong>Teaching schematic:</strong> The sequence and major directions are physiologically guided. Shapes, distances,
+        front positions, and elapsed screen time are not a quantitative activation map.
       </div>
     </div>
   )
@@ -2574,13 +2572,13 @@ export default function CardiacBridge() {
         <Section
           label="2D"
           title="Conduction Animation"
-          subtitle="Watch depolarization propagate through the conduction system in real time. Use the scrubber to move to any point in the cardiac cycle."
+          subtitle="Follow a physiologically guided schematic of activation and recovery. Use the scrubber to examine each stage of the cardiac cycle."
         >
           <ConductionSection rhythm={rhythm} />
           <Callout>
             The AV node is the rate-limiting step at 0.05 m/s — 20× slower than atrial muscle.
             Once past the AV node, the His-Purkinje system accelerates conduction 40–80× faster than myocardium,
-            delivering simultaneous endocardial activation across both ventricles.
+            producing rapid, near-synchronous endocardial activation across both ventricles.
           </Callout>
         </Section>
       )}
