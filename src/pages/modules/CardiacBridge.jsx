@@ -803,7 +803,18 @@ function buildExcitationContractionWave(phys, phases, kind, n = 160) {
   return { calcium, force, calciumPeak, forcePeak }
 }
 
-const PHASE_NUMBER = { p4r: '4', p0: '0', p1: '1', p2: '2', p3: '3', p4d: '4' }
+// Fast response cells display phases 0 through 4. Slow response nodal cells
+// have no distinct phases 1 or 2, so their phase bands display only 4, 0, and 3.
+const PHASE_NUMBER = {
+  p4r: '4',
+  p4: '4',
+  p0: '0',
+  p1: '1',
+  p2: '2',
+  p3: '3',
+  repol: '3',
+  p4d: '4',
+}
 
 // ── Ion channel gating tables — per-phase openness (0–1), looked up by the
 // CURRENT phase id each frame. No hover required: IonChannelRow below reads
@@ -1167,22 +1178,22 @@ function LiveActionPotentials() {
     sa: {
       title: 'SA Node — Automaticity',
       sub: `Fires first · maximum diastolic potential ${phys.sa.mdp.toFixed(1)} mV · ${Math.round(phys.saRate)} bpm`,
-      data: sa.data, phases: sa.phases, channels: SA_ION_CHANNELS, color: '#34d399', showPhaseNumbers: false,
+      data: sa.data, phases: sa.phases, channels: SA_ION_CHANNELS, color: '#34d399', showPhaseNumbers: true,
     },
     atrium: {
       title: 'Atrial Myocyte',
       sub: 'Depolarizes shortly after the SA node · brief plateau',
-      data: atr.data, phases: atr.phases, channels: ATRIAL_ION_CHANNELS, color: '#fbbf24', showPhaseNumbers: false, mechanics: atrialMechanics,
+      data: atr.data, phases: atr.phases, channels: ATRIAL_ION_CHANNELS, color: '#fbbf24', showPhaseNumbers: true, mechanics: atrialMechanics,
     },
     av: {
       title: 'AV Node — Slow Conduction',
       sub: `Activated by atrial input · slow response AP · AV delay ${phys.avDelayMs} ms`,
-      data: av.data, phases: av.phases, channels: AV_ION_CHANNELS, color: '#f472b6', showPhaseNumbers: false,
+      data: av.data, phases: av.phases, channels: AV_ION_CHANNELS, color: '#f472b6', showPhaseNumbers: true,
     },
     purkinje: {
       title: 'Purkinje Fiber',
       sub: 'Activated after the AV node, His bundle, and bundle branches · before ventricular myocytes',
-      data: pk.data, phases: pk.phases, channels: PK_ION_CHANNELS, color: '#a78bfa', showPhaseNumbers: false,
+      data: pk.data, phases: pk.phases, channels: PK_ION_CHANNELS, color: '#a78bfa', showPhaseNumbers: true,
     },
     ventricle: {
       title: 'Ventricular Myocyte',
