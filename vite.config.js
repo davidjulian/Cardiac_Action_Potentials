@@ -4,5 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/PCB3713C-ECG-Lab/',
+  // Relative assets allow the focused app to deploy from any GitHub Pages
+  // repository name without editing this file.
+  base: './',
 })

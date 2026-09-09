@@ -508,7 +508,6 @@ function AnatomyDiagram({ selected, onSelect }) {
             <h3 className="text-sm font-semibold text-white mb-3">{info.name}</h3>
             <InfoRow label="Primary function" value={info.fn} />
             <InfoRow label="Electrical role" value={info.electrical} />
-            <InfoRow label="ECG correlation" value={info.ECG} />
           </div>
         ) : (
           <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 h-full flex flex-col justify-center text-center">
@@ -531,6 +530,8 @@ const AP_VMIN = -100, AP_VMAX = 45
 // which is what caused the visible flashing.
 const AP_Y_DOMAIN = [AP_VMIN, AP_VMAX]
 const ECG_Y_DOMAIN = [0, 1.5]
+const CALCIUM_Y_DOMAIN = [0, 1.8]
+const FORCE_Y_DOMAIN = [0, 1.2]
 const AP_PHASE_COLORS = {
   p4:    [59,  130, 246, 40],
   p0:    [239, 68,  68,  50],
@@ -722,6 +723,58 @@ function buildWorkingCellWave({ restingMv, upstrokePeak, upstrokeSlowFactor, pla
   return { data, phases }
 }
 
+// A compact excitation contraction model for teaching. It is deliberately
+// phenomenological: the AP supplies timing, extracellular calcium and beta-1
+// tone scale trigger calcium, and a delayed saturating response generates
+// relative twitch force. These traces explain causal relationships without
+// implying research-grade calcium or sarcomere kinetics.
+function normalizedTransient(dt, rise, decay) {
+  if (dt < 0) return 0
+  const raw = (1 - Math.exp(-dt / rise)) * Math.exp(-dt / decay)
+  const peakT = rise * Math.log(1 + decay / rise)
+  const peak = (1 - Math.exp(-peakT / rise)) * Math.exp(-peakT / decay)
+  return peak > 0 ? raw / peak : 0
+}
+
+function buildExcitationContractionWave(phys, phases, kind, n = 160) {
+  const plateau = phases.find(phase => phase.id === 'p2')
+  const onset = plateau?.tRange[0] ?? 0.22
+  const isAtrium = kind === 'atrium'
+
+  const sympatheticGain = clamp(1 + 0.85 * (phys.symp - 0.2), 0.65, 1.7)
+  const calciumGain = clamp(Math.pow(phys.caMgDl / 9.5, 1.15), 0.42, 1.75)
+  const potassiumGain = phys.kMEqL > 4
+    ? clamp(1 - 0.10 * (phys.kMEqL - 4), 0.35, 1)
+    : clamp(1 - 0.025 * (4 - phys.kMEqL), 0.88, 1)
+  const vagalGain = isAtrium ? clamp(1 - 0.22 * (phys.para - 0.2), 0.78, 1.05) : 1
+  const cellGain = isAtrium ? 0.72 : 1
+  const calciumPeak = cellGain * sympatheticGain * calciumGain * potassiumGain * vagalGain
+
+  const lusitropy = clamp(1 + 0.55 * (phys.symp - 0.2), 0.88, 1.45)
+  const caRise = isAtrium ? 0.026 : 0.034
+  const caDecay = (isAtrium ? 0.105 : 0.175) / lusitropy
+  const forceDelay = isAtrium ? 0.025 : 0.035
+  const forceRise = isAtrium ? 0.040 : 0.055
+  const forceDecay = (isAtrium ? 0.145 : 0.235) / lusitropy
+  const hillN = 2.8
+  const hillKd = 0.62
+  const activation = Math.pow(calciumPeak, hillN) / (Math.pow(hillKd, hillN) + Math.pow(calciumPeak, hillN))
+  const baselineActivation = 1 / (Math.pow(hillKd, hillN) + 1)
+  const forcePeak = clamp(activation / baselineActivation, 0, 1.35)
+
+  const calcium = []
+  const force = []
+  for (let i = 0; i <= n; i++) {
+    const t = i / n
+    const ca = calciumPeak * normalizedTransient(t - onset, caRise, caDecay)
+    const twitch = forcePeak * normalizedTransient(t - onset - forceDelay, forceRise, forceDecay)
+    calcium.push([t, Math.round(ca * 1000) / 1000])
+    force.push([t, Math.round(twitch * 1000) / 1000])
+  }
+
+  return { calcium, force, calciumPeak, forcePeak }
+}
+
 const PHASE_NUMBER = { p4r: '4', p0: '0', p1: '1', p2: '2', p3: '3', p4d: '4' }
 
 // ── Ion channel gating tables — per-phase openness (0–1), looked up by the
@@ -858,7 +911,7 @@ function PhaseLabel({ clockRef, cycleMs, phases }) {
 
 // One live panel = trace (TraceCanvas) + optional phase-number bands +
 // live phase description + the ion channel row underneath.
-function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, color, showPhaseNumbers }) {
+function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, color, showPhaseNumbers, mechanics }) {
   const xDomain = useMemo(() => [0, cycleMs], [cycleMs])
   const phaseMarkers = useMemo(
     () => phases.map(ph => {
@@ -874,6 +927,14 @@ function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, co
     [phases, cycleMs, showPhaseNumbers]
   )
   const valueAt = useCallback((t) => interpAP(data, t / cycleMs), [data, cycleMs])
+  const calciumAt = useCallback(
+    (t) => mechanics ? interpAP(mechanics.calcium, t / cycleMs) : 0,
+    [mechanics, cycleMs]
+  )
+  const forceAt = useCallback(
+    (t) => mechanics ? interpAP(mechanics.force, t / cycleMs) : 0,
+    [mechanics, cycleMs]
+  )
 
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-900/60 overflow-hidden flex-1 min-w-0">
@@ -883,7 +944,7 @@ function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, co
       </div>
       <div className="flex items-baseline justify-between px-3 pb-0.5">
         <span className="text-[10px] font-semibold" style={{ color }}>Membrane Potential (mV)</span>
-        <span className="text-[9px] text-gray-600">−100 to +50 mV — NOT what an ECG records</span>
+        <span className="text-[9px] text-gray-600">Intracellular membrane potential</span>
       </div>
       <TraceCanvas
         clockRef={clockRef}
@@ -897,6 +958,41 @@ function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, co
       />
       <PhaseLabel clockRef={clockRef} cycleMs={cycleMs} phases={phases} />
       <IonChannelRow clockRef={clockRef} cycleMs={cycleMs} phases={phases} channels={channels} />
+      {mechanics ? (
+        <div className="border-t border-gray-800 bg-gray-950/35">
+          <div className="flex items-baseline justify-between px-3 pt-2 pb-0.5">
+            <span className="text-[10px] font-semibold text-cyan-300">Relative cytosolic Ca²⁺</span>
+            <span className="text-[9px] text-gray-600">Ca²⁺ induced Ca²⁺ release</span>
+          </div>
+          <TraceCanvas
+            clockRef={clockRef}
+            valueAt={calciumAt}
+            xDomain={xDomain}
+            yDomain={CALCIUM_Y_DOMAIN}
+            color="#22d3ee"
+            height={74}
+          />
+          <div className="flex items-baseline justify-between px-3 pt-1.5 pb-0.5">
+            <span className="text-[10px] font-semibold text-rose-300">Relative twitch force</span>
+            <span className="text-[9px] text-gray-600">Peak {Math.round(mechanics.forcePeak * 100)}%</span>
+          </div>
+          <TraceCanvas
+            clockRef={clockRef}
+            valueAt={forceAt}
+            xDomain={xDomain}
+            yDomain={FORCE_Y_DOMAIN}
+            color="#fb7185"
+            height={74}
+          />
+          <p className="px-3 py-2 text-[10px] text-gray-500 leading-relaxed">
+            Calcium rises after L type channels open. Force follows after a short delay as calcium binds troponin and activates cross bridges.
+          </p>
+        </div>
+      ) : (
+        <p className="px-3 py-2 border-t border-gray-800 text-[10px] text-gray-600 leading-relaxed">
+          Specialized electrical tissue: pumping force is not displayed.
+        </p>
+      )}
     </div>
   )
 }
@@ -911,6 +1007,7 @@ function LabeledSlider({ label, value, onChange, min, max, step = 1, unit = '', 
       <input
         type="range" min={min} max={max} step={step} value={value}
         onChange={e => onChange(Number(e.target.value))}
+        aria-label={label}
         className={`w-full ${accent}`}
       />
     </div>
@@ -939,6 +1036,14 @@ function LiveActionPotentials() {
   const atr = useMemo(() => buildWorkingCellWave(phys.atrium, 'atrium'), [phys.atrium])
   const myo = useMemo(() => buildWorkingCellWave(phys.ventricle, 'ventricle'), [phys.ventricle])
   const pk  = useMemo(() => buildWorkingCellWave(phys.purkinje, 'purkinje'), [phys.purkinje])
+  const atrialMechanics = useMemo(
+    () => buildExcitationContractionWave(phys, atr.phases, 'atrium'),
+    [phys, atr.phases]
+  )
+  const ventricularMechanics = useMemo(
+    () => buildExcitationContractionWave(phys, myo.phases, 'ventricle'),
+    [phys, myo.phases]
+  )
 
   const { clockRef, tMs, isPlaying, toggle, scrub } = useLocalClock(phys.cycleMs, null, speed)
 
@@ -953,7 +1058,7 @@ function LiveActionPotentials() {
         The cursor loops once per cardiac cycle. Watch the order: SA node fires first, the atrium follows almost
         immediately, then ventricle and Purkinje fire together after the AV delay.
       </p>
-      <div className="flex flex-col lg:flex-row gap-2 items-stretch">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-2 items-stretch">
         <APLivePanel
           clockRef={clockRef} cycleMs={phys.cycleMs}
           title="SA Node — Automaticity" sub="(no external stimulus needed) — fires first"
@@ -964,13 +1069,13 @@ function LiveActionPotentials() {
           clockRef={clockRef} cycleMs={phys.cycleMs}
           title="Atrial Myocyte" sub="Fires just after SA — brief plateau"
           data={atr.data} phases={atr.phases} channels={ATRIAL_ION_CHANNELS}
-          color="#fbbf24" showPhaseNumbers={false}
+          color="#fbbf24" showPhaseNumbers={false} mechanics={atrialMechanics}
         />
         <APLivePanel
           clockRef={clockRef} cycleMs={phys.cycleMs}
           title="Ventricular Myocyte" sub="Working myocardium (Phases 0–4) — fires after the AV delay"
           data={myo.data} phases={myo.phases} channels={MYO_ION_CHANNELS}
-          color="#60a5fa" showPhaseNumbers
+          color="#60a5fa" showPhaseNumbers mechanics={ventricularMechanics}
         />
         <APLivePanel
           clockRef={clockRef} cycleMs={phys.cycleMs}
@@ -1012,6 +1117,18 @@ function LiveActionPotentials() {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            setSympathetic(20)
+            setParasympathetic(20)
+            setKMEqL(4.0)
+            setCaMgDl(9.5)
+          }}
+          className="px-3 py-1.5 rounded-lg text-xs border border-gray-700 bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+        >
+          Reset physiology
+        </button>
       </div>
 
       {/* ── ANS controls ── */}
@@ -1031,7 +1148,7 @@ function LiveActionPotentials() {
           <Callout>
             <strong>Sympathetic (β1 adrenergic):</strong> Noradrenaline / adrenaline → β1 receptor → ↑ If, ↑ ICa-L.
             SA node Phase 4 slope steepens (faster automaticity) and cycle shortens; max diastolic potential becomes
-            slightly less negative. Ventricular/Purkinje AP duration slightly shortens (upstroke unchanged).
+            slightly less negative. In working myocardium, trigger Ca²⁺, twitch force, and relaxation rate increase.
           </Callout>
           <Callout>
             <strong>Parasympathetic (M2 cholinergic):</strong> ACh → M2 receptor → IKAch opens → hyperpolarization.
@@ -1043,7 +1160,7 @@ function LiveActionPotentials() {
         <div className="flex flex-wrap items-center gap-3 mt-2 px-3 py-1.5 rounded-lg bg-gray-950/50 border border-gray-800">
           <span className="text-xs text-gray-400">AV node conduction delay</span>
           <span className="text-sm font-mono text-amber-300">Δt ≈ {phys.avDelayMs} ms</span>
-          <span className="text-[11px] text-gray-600">Bridges to the PR interval in Module 2, Lab 2 — no ECG shown here.</span>
+          <span className="text-[11px] text-gray-600">Time available for atrial contraction and ventricular filling.</span>
         </div>
         {phys.bothElevated && (
           <div className="mt-1.5 px-3 py-1 rounded-lg bg-purple-950/40 border border-purple-700/40 text-xs text-purple-300">
@@ -1077,22 +1194,28 @@ function LiveActionPotentials() {
         <div className="grid sm:grid-cols-2 gap-2 mt-2">
           {kMEqL > 5.5 ? (
             <Callout>
-              ↑ [K⁺]out reduces the K⁺ driving force → EK shifts toward 0 → resting Vm follows EK (Nernst equation).
-              AP amplitude decreases, and Phase 0 upstroke slows as Na⁺ channels are partially inactivated.
+              ↑ [K⁺]out shifts EK toward 0, so resting Vm becomes less negative. Persistent depolarization leaves
+              fewer fast Na⁺ channels available, reducing AP amplitude and slowing the Phase 0 upstroke.
             </Callout>
           ) : kMEqL < 3.5 ? (
             <Callout>
-              ↓ [K⁺]out makes resting membrane potential more negative. Phase 3 repolarization slows (reduced IK
-              driving force), SA node automaticity paradoxically increases slightly, and a small U-wave analog
-              appears on the ventricular trace after Phase 3.
+              ↓ [K⁺]out shifts EK more negative and makes resting Vm more negative. Repolarization can still slow
+              as conductance through repolarizing K⁺ channels, especially IKr, falls. A small U wave analog appears
+              after ventricular Phase 3.
             </Callout>
           ) : (
             <Callout>Extracellular [K⁺] is within the normal 3.5–5.0 mEq/L range — resting potential and repolarization are unaffected.</Callout>
           )}
           {caMgDl < 8.5 ? (
-            <Callout>↓ [Ca²⁺]out → reduced ICa-L → prolonged plateau. Phase 2 lengthens and AP duration increases.</Callout>
+            <Callout>
+              ↓ [Ca²⁺]out reduces trigger Ca²⁺ and twitch force. Weaker Ca²⁺ dependent inactivation lets the
+              remaining ICa-L persist longer, prolonging Phase 2 and AP duration.
+            </Callout>
           ) : caMgDl > 10.5 ? (
-            <Callout>↑ [Ca²⁺]out → enhanced ICa-L → shortened plateau. Phase 2 shortens and AP duration decreases.</Callout>
+            <Callout>
+              ↑ [Ca²⁺]out increases trigger Ca²⁺ and twitch force. Stronger Ca²⁺ dependent inactivation helps
+              terminate ICa-L sooner, shortening Phase 2 and AP duration.
+            </Callout>
           ) : (
             <Callout>Extracellular [Ca²⁺] is within the normal 8.5–10.5 mg/dL range — the plateau duration is unaffected.</Callout>
           )}
@@ -1105,9 +1228,9 @@ function LiveActionPotentials() {
         )}
       </div>
 
-      {/* No ECG in this section — intracellular recordings only */}
+      {/* Intracellular and mechanical teaching signals only */}
       <p className="mt-2 text-[11px] text-gray-600 text-center leading-relaxed">
-        The traces above require an intracellular microelectrode. An ECG cannot measure membrane potential — see section 2C.
+        Membrane potential requires an intracellular electrode. Calcium and force are normalized teaching-model outputs, not clinical measurements.
       </p>
     </div>
   )
@@ -1748,6 +1871,22 @@ function ECGVsAPSection({ rhythm }) {
 }
 
 // ── 2D: Conduction Animation ────────────────────────────────────────────────
+const STRUCT_LAB_NOTE = {
+  sa: 'The SA node initiates each normal cycle through spontaneous Phase 4 depolarization.',
+  ra: 'Right atrial myocardium conducts the wavefront away from the SA node at about 1 m/s.',
+  la: "The left atrium activates through Bachmann's bundle shortly after the right atrium.",
+  bachmann: "Bachmann's bundle carries excitation from the right atrium to the left atrium.",
+  av: 'The AV node conducts slowly, creating time for atrial contraction and ventricular filling.',
+  his: 'The Bundle of His carries excitation through the electrically insulating fibrous skeleton.',
+  rbundle: 'The right bundle branch rapidly delivers excitation toward the right ventricular endocardium.',
+  lbundle: 'The left bundle branch rapidly delivers excitation toward the left ventricular endocardium.',
+  rv: 'Right ventricular myocardium activates from endocardium toward epicardium.',
+  lv: 'Left ventricular myocardium activates from endocardium toward epicardium.',
+  apex: 'The Purkinje network distributes excitation rapidly across the ventricular endocardium.',
+  repolLV: 'Left ventricular myocardium is returning toward its resting membrane potential.',
+  repolRV: 'Right ventricular myocardium is returning toward its resting membrane potential.',
+}
+
 // Owns its own clock now that 2D is a standalone tab, never mounted
 // alongside 2E — they used to share one master clock via props from the
 // top-level CardiacBridge component; now each tab gets its own via the
@@ -1756,7 +1895,6 @@ function ConductionSection({ rhythm }) {
   const cycleMs = rhythm.cycleMs || CYCLE_MS
   const { clockRef, tMs, isPlaying, toggle, scrub } = useLocalClock(cycleMs, rhythm.nativeCycleMs ?? null)
   const conductionMap = useMemo(() => buildConductionMap('normalSinus', rhythm.waves), [rhythm.waves])
-  const [showVector, setShowVector] = useState(false)
 
   const { structName, cv, note } = useMemo(() => {
     if (!conductionMap || conductionMap.length === 0)
@@ -1767,7 +1905,7 @@ function ConductionSection({ rhythm }) {
         return {
           structName: STRUCT_NAMES[id] || id,
           cv: STRUCT_CV[id] || '—',
-          note: STRUCT_NOTE[id] || '',
+          note: STRUCT_LAB_NOTE[id] || '',
         }
       }
     }
@@ -1794,15 +1932,6 @@ function ConductionSection({ rhythm }) {
             rhythmId="normalSinusVoltage"
             rhythm={rhythm}
           />
-          {showVector && (
-            <CardiacVectorOverlay
-              clockRef={clockRef}
-              waves={rhythm.waves}
-              cycleMs={cycleMs}
-              width={280}
-              height={330}
-            />
-          )}
         </div>
 
         {/* Side panel */}
@@ -1852,16 +1981,6 @@ function ConductionSection({ rhythm }) {
           className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
         >
           Reset
-        </button>
-        <button
-          onClick={() => setShowVector(v => !v)}
-          className={`px-4 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-            showVector
-              ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/50'
-              : 'bg-gray-800 text-gray-500 border-gray-700 hover:text-gray-300'
-          }`}
-        >
-          Cardiac vector {showVector ? 'ON' : 'OFF'}
         </button>
         <input
           type="range"
@@ -2298,11 +2417,9 @@ function VectorCycle({ rhythm }) {
 }
 
 const MODULE2_TABS = [
-  { id: '2A', label: '2A · Anatomy' },
-  { id: '2B', label: '2B · AP by Cell Type' },
-  { id: '2C', label: '2C · AP vs ECG' },
-  { id: '2D', label: '2D · Conduction Animation' },
-  { id: '2E', label: '2E · Vector Cycle' },
+  { id: '2A', label: '2A · Cardiac Anatomy', shortLabel: 'Cardiac anatomy' },
+  { id: '2B', label: '2B · Action Potentials', shortLabel: 'Action potentials' },
+  { id: '2D', label: '2D · Conduction', shortLabel: 'Conduction' },
 ]
 
 // ── Main export ────────────────────────────────────────────────────────────
@@ -2315,8 +2432,6 @@ export default function CardiacBridge() {
     }
   }, [])
 
-  const axis = useMemo(() => meanQRSAxis(rhythm.waves), [rhythm.waves])
-
   const [selected2A, setSelected2A] = useState(null)
 
   const { active, visited, setActive } = useTabState('cardiac', MODULE2_TABS.map(t => t.id))
@@ -2328,21 +2443,20 @@ export default function CardiacBridge() {
     <ModulePage
       moduleId="cardiac"
       number={2}
-      title="Cardiac electrophysiology"
+      title="Cardiac Action Potentials"
       wide={active === '2B'}
     >
       {active === '2A' && (
         <Section
           label="2A"
           title="Heart Anatomy Overview"
-          subtitle="Hover or click any structure to see its primary function, electrical behavior, and ECG correlation."
+          subtitle="Hover or click any structure to see its primary function and electrical behavior."
         >
           <AnatomyDiagram selected={selected2A} onSelect={setSelected2A} />
           <Callout>
             The SA node is the heart's primary pacemaker — it fires spontaneously without any external trigger.
-            The AV node imposes a deliberate 120–200 ms delay (the PR segment) that allows ventricular filling
-            before systole. The His-Purkinje system then accelerates conduction to near-simultaneous ventricular
-            activation, producing the narrow (&lt;100 ms) QRS complex.
+            The AV node imposes a deliberate delay that allows ventricular filling before systole. The
+            His-Purkinje system then accelerates conduction to near-simultaneous ventricular activation.
           </Callout>
         </Section>
       )}
@@ -2363,21 +2477,11 @@ export default function CardiacBridge() {
         </Section>
       )}
 
-      {active === '2C' && (
-        <Section
-          label="2C"
-          title="What Does the ECG Actually Record?"
-          subtitle="An intracellular electrode measures voltage across one cell's membrane. The ECG measures the net dipole moment of the entire heart from the body surface. Drag the electrode into a region to compare its action potential with the simultaneous ECG trace."
-        >
-          <ECGVsAPSection rhythm={rhythm} />
-        </Section>
-      )}
-
       {active === '2D' && (
         <Section
           label="2D"
           title="Conduction Animation"
-          subtitle="Watch depolarization propagate through the conduction system in real time. Use the scrubber to move to any point in the cardiac cycle, and toggle the cardiac vector to see the net dipole this wavefront produces at each instant."
+          subtitle="Watch depolarization propagate through the conduction system in real time. Use the scrubber to move to any point in the cardiac cycle."
         >
           <ConductionSection rhythm={rhythm} />
           <Callout>
@@ -2385,34 +2489,9 @@ export default function CardiacBridge() {
             Once past the AV node, the His-Purkinje system accelerates conduction 40–80× faster than myocardium,
             delivering simultaneous endocardial activation across both ventricles.
           </Callout>
-          <Callout>
-            The boundary between depolarized and resting tissue creates a dipole vector — identical to the
-            dipole model from Module 1. During QRS, the depolarization wavefront sweeps left and inferiorly
-            (toward the dominant LV mass), which is why the normal axis is +60°. During repolarization (T wave),
-            the wave travels epicardium→endocardium (opposite to depolarization), but still produces the same
-            polarity deflection in most leads because the gradient is reversed.
-          </Callout>
         </Section>
       )}
 
-      {active === '2E' && (
-        <Section
-          label="2E"
-          title="Cardiac Vector Cycle"
-          subtitle="The cardiac vector rotates through different angles during P, QRS, and T. The projection onto each lead axis determines that lead's deflection — positive projection → upward deflection."
-        >
-          <VectorCycle rhythm={rhythm} />
-          <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4 mb-3 mt-3">
-            <AxisSummaryPanel angleDeg={axis.angleDeg} leadIMm={axis.leadIMm} leadAVFMm={axis.leadAVFMm} />
-          </div>
-          <Callout>
-            Lead II (60°) is aligned with the normal axis and shows the tallest P wave and R wave.
-            Lead I (0°) projects the leftward component. aVR (−150°) is always negative in a normal heart
-            because the main QRS vector points away from it. The T wave in most leads has the same polarity
-            as the QRS because repolarization proceeds epicardium→endocardium (the same net direction).
-          </Callout>
-        </Section>
-      )}
     </ModulePage>
   )
 }

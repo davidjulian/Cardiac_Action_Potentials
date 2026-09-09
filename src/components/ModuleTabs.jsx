@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useMode, MODE_ACCENT } from '../context/ModeContext'
 import { useModuleTabsContext } from '../context/ModuleTabsContext'
 
 // Reads/writes { active, visited } to localStorage, keyed per module — this
 // is a UI-only convenience (which tab you were last on, which you've opened
-// at least once), not learning progress, so it deliberately doesn't touch
-// Supabase/ModeContext's progress tracking. Falls back gracefully (first
-// tab, empty visited set) if localStorage is unavailable (private browsing)
-// or nothing's been stored yet.
+// at least once), not assessed learning progress. It falls back gracefully
+// (first tab, empty visited set) if localStorage is unavailable (private
+// browsing) or nothing has been stored yet.
 function readStored(moduleId) {
   try {
     const raw = localStorage.getItem(`ekg-tabs:${moduleId}`)
@@ -80,8 +78,7 @@ export function usePublishTabs(moduleId, tabs, { active, visited, setActive }) {
  *   onSelect — (id) => void
  */
 export default function ModuleTabs({ tabs, active, visited, onSelect }) {
-  const { mode } = useMode()
-  const accent = MODE_ACCENT[mode === 'lab' ? 'lab' : 'free']
+  const accent = '#34d399'
 
   return (
     <div className="flex flex-wrap gap-1.5 mb-2.5" role="tablist">
