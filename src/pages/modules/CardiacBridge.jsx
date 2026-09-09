@@ -993,7 +993,7 @@ function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, co
     <div className="rounded-xl border border-gray-800 bg-gray-900/60 overflow-hidden flex-1 min-w-0">
       <div className="px-3 pt-1.5 pb-0.5">
         <div className="text-sm font-semibold text-gray-100 leading-snug">{title}</div>
-        <div className="text-xs font-medium text-gray-300 leading-snug">{sub}</div>
+        <div className="min-h-9 text-xs font-medium leading-snug text-gray-300">{sub}</div>
       </div>
       <div className="flex items-baseline justify-between px-3 pb-0.5">
         <span className="text-xs font-semibold" style={{ color }}>Membrane Potential (mV)</span>
