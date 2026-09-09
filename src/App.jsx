@@ -124,7 +124,7 @@ function AboutModal({ onClose }) {
         <div className="mt-5 rounded-xl border border-emerald-900/70 bg-emerald-950/30 p-4">
           <p className="text-sm text-gray-400">Primary developer</p>
           <p className="mt-1 text-lg font-semibold text-emerald-300">Jacob Walker</p>
-          <p className="text-sm text-gray-300">Biomedical Engineering, Class of 2027</p>
+          <p className="text-sm text-gray-300">UF Biomedical Engineering, Class of 2027</p>
         </div>
 
         <p className="mt-5 text-sm leading-relaxed text-gray-400">
