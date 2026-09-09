@@ -577,6 +577,16 @@ function computeAPPhysiology({ sympathetic, parasympathetic, kMEqL, caMgDl }) {
     threshold: -40,
   }
 
+  // AV nodal cells are also slow-response cells, but the normal atrial
+  // impulse activates them before their slower latent pacemaker drift reaches
+  // threshold. Autonomic tone changes nodal membrane behavior directly; it
+  // does not silently alter the extracellular ion controls.
+  const av = {
+    mdp: clamp(-64 + 3 * symp - 8 * para + saKShift, -78, -48),
+    phase4Frac: clamp(0.84 - 0.06 * symp + 0.08 * para, 0.70, 0.92),
+    threshold: -40,
+  }
+
   // ── Ventricular / Purkinje shared K+ / Ca2+ / sympathetic effects ──
   const restingMv = kDev >= 0
     ? clamp(-90 + 7 * kDev, -90, -45)
@@ -588,12 +598,12 @@ function computeAPPhysiology({ sympathetic, parasympathetic, kMEqL, caMgDl }) {
   const uWaveMv = kMEqL < 3.5 ? clamp((3.5 - kMEqL) * 4, 0, 15) : 0
   const cellShared = { restingMv, upstrokePeak, upstrokeSlowFactor, plateauScale, repolSlowFactor, uWaveMv }
 
-  // ── AV conduction delay indicator (parasympathetic lengthens, no trace) ──
+  // ── AV conduction delay (parasympathetic lengthens it) ──
   const avDelayMs = Math.round(clamp(140 * (1 + 0.9 * para - 0.25 * symp), 80, 500))
 
   return {
     symp, para, kMEqL, caMgDl, cycleMs, saRate, avDelayMs,
-    sa,
+    sa, av,
     atrium: cellShared,
     ventricle: cellShared,
     purkinje: cellShared,
@@ -605,15 +615,18 @@ function computeAPPhysiology({ sympathetic, parasympathetic, kMEqL, caMgDl }) {
 // changes, reusing interpAP()'s fraction-space lookup convention so these
 // plug straight into TraceCanvas the same way the static 2C arrays do. ──
 //
-// SA node fires FIRST in the shared cycle. The other panels' own upstroke
-// already sits early in their [0,1] fraction space (see p0Start below), so
-// rather than shifting every panel, only the SA wave is rotated — its
-// upstroke (originally at phase4Frac, deep into its own [0,1] window) is
-// remapped to sit at shared t≈0, with the long Phase 4 pacemaker ramp now
-// occupying the END of the visible window, building back up to threshold
-// exactly as the cursor wraps into the next lap. That reads as "SA fires,
-// then everything else follows" instead of the reverse.
-function buildSAWave({ mdp, phase4Frac, threshold }, n = 60) {
+// Slow response waves can be placed anywhere in the shared cycle. The SA
+// node fires at t≈0; the AV node is triggered shortly after atrial activation.
+// Their Phase 4 drift wraps across the end of the displayed cycle and builds
+// back toward the next activation.
+function splitPhaseWindow(lo, hi) {
+  const start = ((lo % 1) + 1) % 1
+  const duration = hi - lo
+  const end = start + duration
+  return end <= 1 ? [[start, end]] : [[start, 1], [0, end - 1]]
+}
+
+function buildSlowResponseWave({ mdp, phase4Frac, threshold }, { n = 60, fireAtFrac = 0, tissue = 'sa' } = {}) {
   const peak = 15
   const upDur = clamp(0.10, 0.04, 0.94 - phase4Frac) // upstroke+repol duration, unrotated
   const p0End = phase4Frac + upDur
@@ -623,12 +636,14 @@ function buildSAWave({ mdp, phase4Frac, threshold }, n = 60) {
 
   const data = []
   for (let i = 0; i <= n; i++) {
-    const tR = i / n                          // rotated (shared-timeline) fraction
-    const t  = (tR + phase4Frac) % 1           // original fraction, for the same formulas as before
+    const tR = i / n
+    const t = ((tR - fireAtFrac + phase4Frac) % 1 + 1) % 1
     let v
     if (t <= phase4Frac) {
       const f = phase4Frac === 0 ? 1 : t / phase4Frac
-      v = mdp + (threshold - mdp) * Math.pow(f, 1.6)
+      // The drift begins immediately after repolarization, with additional
+      // acceleration as threshold approaches.
+      v = mdp + (threshold - mdp) * (0.4 * f + 0.6 * f * f)
     } else if (t <= p0End) {
       v = threshold + (peak - threshold) * smooth01((t - phase4Frac) / (p0End - phase4Frac))
     } else {
@@ -636,17 +651,26 @@ function buildSAWave({ mdp, phase4Frac, threshold }, n = 60) {
     }
     data.push([tR, Math.round(v * 10) / 10])
   }
-  const phases = [
-    { id: 'p0', label: 'Upstroke — ICa-L driven', tRange: [0, upEndR],
-      channels: 'ICa-L — NO fast INa', short: 'SA fires first — ICa-L opens. No fast INa — explains slow conduction velocity (~0.05 m/s)',
+  const phaseDefs = [
+    { id: 'p0', label: 'Upstroke — ICa-L driven', bounds: [0, upEndR],
+      channels: 'ICa-L — NO fast INa', short: tissue === 'av'
+        ? 'Atrial input triggers the AV node — ICa-L carries the slow Phase 0 current'
+        : 'SA fires first — ICa-L opens. No fast INa — explains the slow upstroke',
       ions: 'Ca²⁺ in via L-type channels → slow, rounded upstroke. Much slower than ventricular upstroke since there is no fast INa here.' },
-    { id: 'repol', label: 'Repolarization', tRange: [upEndR, repolEndR],
+    { id: 'repol', label: 'Repolarization', bounds: [upEndR, repolEndR],
       channels: 'IK (delayed rectifier) + IK-ACh', short: 'Repolarization — IK + IK-ACh',
       ions: 'K⁺ exits via delayed rectifiers and ACh-gated channels, returning toward the pacemaker potential.' },
-    { id: 'p4', label: 'Phase 4 — Pacemaker Potential', tRange: [repolEndR, 1],
-      channels: 'If (HCN channels) + ICa-T', short: 'Phase 4 — pacemaker potential (If — the pacemaker current) building toward the next beat',
-      ions: 'Na⁺/K⁺ slowly IN via If ("funny current"); Ca²⁺ via T-type channels → gradual depolarization toward threshold. Slope of this ramp sets heart rate — it reaches threshold right as the cursor loops back to fire again.' },
+    { id: 'p4', label: 'Phase 4 — Pacemaker Potential', bounds: [repolEndR, 1],
+      channels: 'If through HCN channels + ICa-T', short: tissue === 'av'
+        ? 'Latent pacemaker drift continues, but the next atrial impulse normally arrives first'
+        : 'Phase 4 — If through HCN channels helps build toward the next beat',
+      ions: tissue === 'av'
+        ? 'HCN and T-type calcium channels support latent automaticity. During normal sinus rhythm, atrial excitation triggers the next AV nodal action potential before this drift reaches threshold.'
+        : 'Mixed cations carry If through HCN channels; Ca²⁺ enters through T-type channels as threshold approaches. The Phase 4 slope helps set heart rate.' },
   ]
+  const phases = phaseDefs.flatMap(({ bounds: [lo, hi], ...phase }) =>
+    splitPhaseWindow(lo + fireAtFrac, hi + fireAtFrac).map(tRange => ({ ...phase, tRange }))
+  )
   return { data, phases }
 }
 
@@ -655,13 +679,13 @@ function buildSAWave({ mdp, phase4Frac, threshold }, n = 60) {
 // then Purkinje fibers after the AV/His/bundle pathway, then ventricular
 // myocardium. Intermediate conduction tissues are named in the pathway
 // ribbon rather than given redundant traces.
-function buildWorkingCellWave({ restingMv, upstrokePeak, upstrokeSlowFactor, plateauScale, repolSlowFactor, uWaveMv }, kind, n = 100) {
+function buildWorkingCellWave({ restingMv, upstrokePeak, upstrokeSlowFactor, plateauScale, repolSlowFactor, uWaveMv }, kind, n = 100, p0StartOverride = null) {
   const isPurkinje = kind === 'purkinje'
   const isAtrium   = kind === 'atrium'
   const cellRestingMv = isAtrium ? clamp(restingMv + 10, -100, -45) : restingMv // atrium's baseline is less negative (~ -80 vs -90)
   const notchMv = cellRestingMv + (upstrokePeak - cellRestingMv) * 0.55
   const plateauMv = isPurkinje ? 4 : isAtrium ? 0 : 2
-  const p0Start = isAtrium ? 0.05 : isPurkinje ? 0.165 : 0.195
+  const p0Start = p0StartOverride ?? (isAtrium ? 0.05 : isPurkinje ? 0.165 : 0.195)
   const p0End = p0Start + (isPurkinje ? 0.021 : isAtrium ? 0.020 : 0.025) * upstrokeSlowFactor
   const p1End = p0End + 0.020
   const basePlateauDur = isPurkinje ? 0.315 : isAtrium ? 0.13 : 0.255
@@ -788,7 +812,13 @@ const SA_ION_CHANNELS = [
   { id: 'If',   label: 'If',       note: 'If through HCN channels — the pacemaker current', levels: { p4: 1,    p0: 0.15, repol: 0.10 } },
   { id: 'ICaT', label: 'ICa-T',    note: 'ICa-T through T-type Ca²⁺ channels — activates near threshold', levels: { p4: 0.65, p0: 0.20, repol: 0 } },
   { id: 'ICaL', label: 'ICa-L',    note: 'ICa-L through L-type Ca²⁺ channels — drives the SA upstroke (NOT INa)', levels: { p4: 0.05, p0: 1,    repol: 0.10 } },
-  { id: 'IK',   label: 'IK/IKAch', note: 'K⁺ currents through delayed rectifier and GIRK channels', levels: { p4: 0.10, p0: 0,    repol: 1 } },
+  { id: 'IK',   label: 'IK/IK-ACh', note: 'K⁺ currents through delayed rectifier and GIRK channels', levels: { p4: 0.10, p0: 0,    repol: 1 } },
+]
+const AV_ION_CHANNELS = [
+  { id: 'If',   label: 'If',       note: 'If through HCN channels — supports latent pacemaker activity', levels: { p4: 0.70, p0: 0.10, repol: 0.10 } },
+  { id: 'ICaT', label: 'ICa-T',    note: 'ICa-T through T-type Ca²⁺ channels — contributes as threshold approaches', levels: { p4: 0.55, p0: 0.20, repol: 0 } },
+  { id: 'ICaL', label: 'ICa-L',    note: 'ICa-L through L-type Ca²⁺ channels — carries the slow AV nodal upstroke', levels: { p4: 0.05, p0: 1, repol: 0.10 } },
+  { id: 'IK',   label: 'IK/IK-ACh', note: 'K⁺ currents through delayed rectifier and GIRK channels', levels: { p4: 0.10, p0: 0, repol: 1 } },
 ]
 const MYO_ION_CHANNELS = [
   { id: 'INa',  label: 'INa',  note: 'Fast Na⁺ — snaps open at Phase 0', levels: { p4r: 0,    p0: 1,    p1: 0.05, p2: 0,    p3: 0,    p4d: 0 } },
@@ -862,7 +892,7 @@ function IonChannelGlossary() {
 }
 
 // Ion channel badge row — reads clockRef directly and mutates DOM opacity
-// via refs (same technique HeartAnimation.jsx uses) so 3 panels animating
+// via refs (same technique HeartAnimation.jsx uses) so several panels animating
 // at once don't force a React re-render 60x/second.
 function IonChannelRow({ clockRef, cycleMs, phases, channels }) {
   const phasesRef = useRef(phases)
@@ -1041,24 +1071,34 @@ function kBarColor(k) {
 
 const SPEEDS = [0.25, 0.5, 1]
 
-const CONDUCTION_PATHWAY = [
-  { label: 'SA node', shown: true },
-  { label: 'Atrial myocardium', shown: true },
-  { label: 'AV node', shown: false },
-  { label: 'His bundle', shown: false },
-  { label: 'Bundle branches', shown: false },
-  { label: 'Purkinje fibers', shown: true },
-  { label: 'Ventricular myocytes', shown: true },
+const TRACE_OPTIONS = [
+  { id: 'sa', label: 'SA node', color: '#34d399' },
+  { id: 'atrium', label: 'Atrial myocyte', color: '#fbbf24' },
+  { id: 'av', label: 'AV node', color: '#f472b6' },
+  { id: 'purkinje', label: 'Purkinje fiber', color: '#a78bfa' },
+  { id: 'ventricle', label: 'Ventricular myocyte', color: '#60a5fa' },
 ]
 
-function ConductionPathway() {
+const CONDUCTION_PATHWAY = [
+  { label: 'SA node', traceId: 'sa' },
+  { label: 'Atrial myocardium', traceId: 'atrium' },
+  { label: 'AV node', traceId: 'av' },
+  { label: 'His bundle', traceId: null },
+  { label: 'Bundle branches', traceId: null },
+  { label: 'Purkinje fibers', traceId: 'purkinje' },
+  { label: 'Ventricular myocytes', traceId: 'ventricle' },
+]
+
+function ConductionPathway({ selectedTissues }) {
   return (
     <div className="mb-2 rounded-xl border border-gray-800 bg-gray-900/60 px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-1.5" aria-label="Normal cardiac conduction sequence">
-        {CONDUCTION_PATHWAY.map((item, index) => (
+        {CONDUCTION_PATHWAY.map((item, index) => {
+          const selected = item.traceId && selectedTissues.includes(item.traceId)
+          return (
           <span key={item.label} className="contents">
             <span className={`rounded-md border px-2 py-1 text-xs font-semibold ${
-              item.shown
+              selected
                 ? 'border-emerald-700/60 bg-emerald-950/50 text-emerald-300'
                 : 'border-gray-600 bg-gray-950/50 text-gray-200'
             }`}>
@@ -1066,10 +1106,11 @@ function ConductionPathway() {
             </span>
             {index < CONDUCTION_PATHWAY.length - 1 && <span className="font-bold text-gray-300" aria-hidden="true">→</span>}
           </span>
-        ))}
+          )
+        })}
       </div>
       <p className="mt-2 text-xs leading-relaxed text-gray-300">
-        Green structures have traces below. AV node, His bundle, and bundle branches remain in the pathway even though separate traces are not shown.
+        Green structures have selected traces below. His bundle and bundle branches remain in the pathway even though separate traces are not available.
       </p>
     </div>
   )
@@ -1077,6 +1118,7 @@ function ConductionPathway() {
 
 function LiveActionPotentials() {
   const [lessonView, setLessonView] = useState('compare')
+  const [selectedTissues, setSelectedTissues] = useState(['sa', 'ventricle'])
   const [sympathetic, setSympathetic] = useState(20)
   const [parasympathetic, setParasympathetic] = useState(20)
   const [kMEqL, setKMEqL] = useState(4.0)
@@ -1087,10 +1129,17 @@ function LiveActionPotentials() {
     () => computeAPPhysiology({ sympathetic, parasympathetic, kMEqL, caMgDl }),
     [sympathetic, parasympathetic, kMEqL, caMgDl]
   )
-  const sa  = useMemo(() => buildSAWave(phys.sa), [phys.sa])
-  const atr = useMemo(() => buildWorkingCellWave(phys.atrium, 'atrium'), [phys.atrium])
-  const myo = useMemo(() => buildWorkingCellWave(phys.ventricle, 'ventricle'), [phys.ventricle])
-  const pk  = useMemo(() => buildWorkingCellWave(phys.purkinje, 'purkinje'), [phys.purkinje])
+  const atrialFireFrac = 0.05
+  const avEntryFrac = 0.08
+  const hisActivationFrac = clamp(atrialFireFrac + phys.avDelayMs / phys.cycleMs, 0.13, 0.38)
+  const purkinjeFireFrac = clamp(hisActivationFrac + 20 / phys.cycleMs, 0.15, 0.42)
+  const ventricularFireFrac = clamp(purkinjeFireFrac + 20 / phys.cycleMs, 0.17, 0.45)
+
+  const sa  = useMemo(() => buildSlowResponseWave(phys.sa, { tissue: 'sa' }), [phys.sa])
+  const atr = useMemo(() => buildWorkingCellWave(phys.atrium, 'atrium', 100, atrialFireFrac), [phys.atrium])
+  const av  = useMemo(() => buildSlowResponseWave(phys.av, { fireAtFrac: avEntryFrac, tissue: 'av' }), [phys.av])
+  const pk  = useMemo(() => buildWorkingCellWave(phys.purkinje, 'purkinje', 100, purkinjeFireFrac), [phys.purkinje, purkinjeFireFrac])
+  const myo = useMemo(() => buildWorkingCellWave(phys.ventricle, 'ventricle', 100, ventricularFireFrac), [phys.ventricle, ventricularFireFrac])
   const atrialMechanics = useMemo(
     () => buildExcitationContractionWave(phys, atr.phases, 'atrium'),
     [phys, atr.phases]
@@ -1103,6 +1152,42 @@ function LiveActionPotentials() {
   const { clockRef, tMs, isPlaying, toggle, scrub } = useLocalClock(phys.cycleMs, null, speed)
 
   const kPct = clamp((kMEqL - 2) / (9 - 2) * 100, 0, 100)
+
+  const toggleTissue = (id) => {
+    setSelectedTissues(current => {
+      if (current.includes(id)) return current.length === 1 ? current : current.filter(item => item !== id)
+      return [...current, id]
+    })
+  }
+
+  const tracePanels = {
+    sa: {
+      title: 'SA Node — Automaticity',
+      sub: `Fires first · maximum diastolic potential ${phys.sa.mdp.toFixed(1)} mV · ${Math.round(phys.saRate)} bpm`,
+      data: sa.data, phases: sa.phases, channels: SA_ION_CHANNELS, color: '#34d399', showPhaseNumbers: false,
+    },
+    atrium: {
+      title: 'Atrial Myocyte',
+      sub: 'Depolarizes shortly after the SA node · brief plateau',
+      data: atr.data, phases: atr.phases, channels: ATRIAL_ION_CHANNELS, color: '#fbbf24', showPhaseNumbers: false, mechanics: atrialMechanics,
+    },
+    av: {
+      title: 'AV Node — Slow Conduction',
+      sub: `Activated by atrial input · slow response AP · AV delay ${phys.avDelayMs} ms`,
+      data: av.data, phases: av.phases, channels: AV_ION_CHANNELS, color: '#f472b6', showPhaseNumbers: false,
+    },
+    purkinje: {
+      title: 'Purkinje Fiber',
+      sub: 'Activated after the AV node, His bundle, and bundle branches · before ventricular myocytes',
+      data: pk.data, phases: pk.phases, channels: PK_ION_CHANNELS, color: '#a78bfa', showPhaseNumbers: false,
+    },
+    ventricle: {
+      title: 'Ventricular Myocyte',
+      sub: 'Activated by the Purkinje network · working myocardium',
+      data: myo.data, phases: myo.phases, channels: MYO_ION_CHANNELS, color: '#60a5fa', showPhaseNumbers: true, mechanics: ventricularMechanics,
+    },
+  }
+  const visiblePanels = TRACE_OPTIONS.filter(option => selectedTissues.includes(option.id))
 
   return (
     <div>
@@ -1135,47 +1220,63 @@ function LiveActionPotentials() {
         </button>
       </div>
 
-      <ConductionPathway />
+      <div className="mb-2 rounded-xl border border-gray-800 bg-gray-900/60 p-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="text-sm font-semibold text-gray-100">Choose traces to display</h3>
+          <p className="text-xs text-gray-300">Choose one for close study or several to compare.</p>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2" aria-label="Action potential trace selectors">
+          {TRACE_OPTIONS.map(option => {
+            const selected = selectedTissues.includes(option.id)
+            return (
+              <button
+                key={option.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => toggleTissue(option.id)}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                  selected
+                    ? 'border-emerald-600 bg-emerald-950/60 text-white'
+                    : 'border-gray-600 bg-gray-950/50 text-gray-300 hover:border-gray-400 hover:text-white'
+                }`}
+              >
+                <span className="font-bold" aria-hidden="true">{selected ? '✓' : '+'}</span>
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: option.color }} aria-hidden="true" />
+                {option.label}
+              </button>
+            )
+          })}
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-gray-300">
+          Start with the SA node and ventricular myocyte to compare slow and fast response action potentials. The last selected trace cannot be removed.
+        </p>
+      </div>
+
+      <ConductionPathway selectedTissues={selectedTissues} />
       <p className="text-xs text-gray-300 mb-2 leading-relaxed">
-        The shared cursor reveals sequence as well as shape. Purkinje fibers depolarize after conduction through the
-        AV node, His bundle, and bundle branches, then rapidly deliver excitation to ventricular myocytes.
+        The AV node depolarizes after atrial myocardium. The displayed AV delay represents slow conduction through
+        the nodal region before His bundle, bundle branch, and Purkinje activation. Purkinje fibers then deliver
+        excitation to ventricular myocytes.
       </p>
 
       <div className={lessonView === 'experiment' ? 'xl:grid xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-3' : ''}>
         <div className="min-w-0">
-          <div className={`grid grid-cols-1 gap-2 items-stretch ${lessonView === 'compare' ? 'xl:grid-cols-2' : ''}`}>
-            <APLivePanel
-              clockRef={clockRef} cycleMs={phys.cycleMs}
-              title="SA Node — Automaticity"
-              sub={`Fires first · maximum diastolic potential ${phys.sa.mdp.toFixed(1)} mV · ${Math.round(phys.saRate)} bpm`}
-              data={sa.data} phases={sa.phases} channels={SA_ION_CHANNELS}
-              color="#34d399" showPhaseNumbers={false}
-            />
-            <APLivePanel
-              clockRef={clockRef} cycleMs={phys.cycleMs}
-              title="Atrial Myocyte" sub="Depolarizes shortly after the SA node · brief plateau"
-              data={atr.data} phases={atr.phases} channels={ATRIAL_ION_CHANNELS}
-              color="#fbbf24" showPhaseNumbers={false} mechanics={atrialMechanics}
-            />
-            <APLivePanel
-              clockRef={clockRef} cycleMs={phys.cycleMs}
-              title="Purkinje Fiber" sub="Depolarizes before ventricular myocytes · fastest conduction"
-              data={pk.data} phases={pk.phases} channels={PK_ION_CHANNELS}
-              color="#a78bfa" showPhaseNumbers={false}
-            />
-            <APLivePanel
-              clockRef={clockRef} cycleMs={phys.cycleMs}
-              title="Ventricular Myocyte" sub="Activated by the Purkinje network · working myocardium"
-              data={myo.data} phases={myo.phases} channels={MYO_ION_CHANNELS}
-              color="#60a5fa" showPhaseNumbers mechanics={ventricularMechanics}
-            />
+          <div className={`grid grid-cols-1 gap-2 items-stretch ${lessonView === 'compare' && visiblePanels.length > 1 ? 'xl:grid-cols-2' : ''}`}>
+            {visiblePanels.map(option => (
+              <APLivePanel
+                key={option.id}
+                clockRef={clockRef}
+                cycleMs={phys.cycleMs}
+                {...tracePanels[option.id]}
+              />
+            ))}
           </div>
           <IonChannelGlossary />
         </div>
 
         <div className={lessonView === 'experiment' ? 'xl:sticky xl:top-3 xl:self-start' : ''}>
 
-      {/* Playback controls — one clock drives all four panels */}
+      {/* Playback controls — one clock drives all selected panels */}
       <div className="flex items-center gap-3 flex-wrap mt-2 rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-2">
         <button
           onClick={toggle}
