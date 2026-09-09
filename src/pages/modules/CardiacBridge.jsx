@@ -22,7 +22,7 @@ const ANATOMY = {
     name: 'SA Node (Sinoatrial Node)',
     apType: 'sa',
     fn: 'Primary pacemaker — spontaneously depolarizes 60–100 times per minute without external stimulus. Located at the junction of the superior vena cava and the right atrium.',
-    electrical: 'Fires via If (HCN "funny" channels) + ICa-T during Phase 4 pacemaker potential. No stable resting potential. Upstroke driven by ICa-L (not fast INa), producing a slow, rounded action potential. Slope of Phase 4 determines heart rate.',
+    electrical: 'During Phase 4, HCN channels conduct If and T-type calcium channels conduct ICa-T. The cell has no stable resting potential. L-type calcium channels conduct the ICa-L that drives the upstroke, rather than fast INa. The slope of Phase 4 helps determine heart rate.',
     ECG: 'Not directly visible on surface ECG. Its firing initiates the P wave, but the SA node signal is too small. Dysfunction manifests as sinus bradycardia, sick sinus syndrome, or sinus arrest.',
   },
   ra: {
@@ -163,7 +163,7 @@ const MYO_PHASES = [
   {
     id: 'p3', label: 'Phase 3 — Rapid Repolarization', tRange: [0.480, 0.580],
     channels: 'IKr + IKs (rapid + slow delayed rectifiers)',
-    ions: 'ICa-L inactivates; IKr/IKs dominate → K⁺ exits rapidly → rapid return to −90 mV. IKr is the hERG channel — target of many drugs causing QT prolongation (torsades risk).',
+    ions: 'ICa-L inactivates; IKr/IKs dominate → K⁺ exits rapidly → rapid return to −90 mV. hERG (Kv11.1) channels are major molecular contributors to IKr and are targets of many drugs that can prolong QT.',
   },
   {
     id: 'p4d', label: 'Phase 4 — Electrical Diastole', tRange: [0.580, 1.0],
@@ -303,7 +303,7 @@ const STRUCT_CV = {
   repolLV: '—', repolRV: '—',
 }
 const STRUCT_NOTE = {
-  sa: 'SA node fires spontaneously via If (HCN channels). Rate governed by slope of Phase 4 pacemaker potential. Not visible on surface ECG directly.',
+  sa: 'SA node fires spontaneously as If conducted through HCN channels helps drive Phase 4. Rate is governed by the slope of the pacemaker potential. Not visible on surface ECG directly.',
   ra: 'Atrial myocardium conducting at ~1 m/s. Right atrium activates first → initial P wave.',
   la: "Left atrium activates via Bachmann's bundle. Terminal P wave. Enlargement → P mitrale.",
   bachmann: "Interatrial conduction pathway connecting RA to LA at ~1 m/s. Failure → ectopic atrial rhythms.",
@@ -785,10 +785,10 @@ const PHASE_NUMBER = { p4r: '4', p0: '0', p1: '1', p2: '2', p3: '3', p4d: '4' }
 // CURRENT phase id each frame. No hover required: IonChannelRow below reads
 // the shared clock directly and updates automatically as the cursor moves. ──
 const SA_ION_CHANNELS = [
-  { id: 'If',   label: 'If',       note: 'If — the pacemaker current', levels: { p4: 1,    p0: 0.15, repol: 0.10 } },
-  { id: 'ICaT', label: 'ICa-T',    note: 'T-type Ca²⁺ — activates near threshold', levels: { p4: 0.65, p0: 0.20, repol: 0 } },
-  { id: 'ICaL', label: 'ICa-L',    note: 'L-type Ca²⁺ — drives the SA upstroke (NOT INa)', levels: { p4: 0.05, p0: 1,    repol: 0.10 } },
-  { id: 'IK',   label: 'IK/IKAch', note: 'Delayed rectifier + ACh-gated K⁺', levels: { p4: 0.10, p0: 0,    repol: 1 } },
+  { id: 'If',   label: 'If',       note: 'If through HCN channels — the pacemaker current', levels: { p4: 1,    p0: 0.15, repol: 0.10 } },
+  { id: 'ICaT', label: 'ICa-T',    note: 'ICa-T through T-type Ca²⁺ channels — activates near threshold', levels: { p4: 0.65, p0: 0.20, repol: 0 } },
+  { id: 'ICaL', label: 'ICa-L',    note: 'ICa-L through L-type Ca²⁺ channels — drives the SA upstroke (NOT INa)', levels: { p4: 0.05, p0: 1,    repol: 0.10 } },
+  { id: 'IK',   label: 'IK/IKAch', note: 'K⁺ currents through delayed rectifier and GIRK channels', levels: { p4: 0.10, p0: 0,    repol: 1 } },
 ]
 const MYO_ION_CHANNELS = [
   { id: 'INa',  label: 'INa',  note: 'Fast Na⁺ — snaps open at Phase 0', levels: { p4r: 0,    p0: 1,    p1: 0.05, p2: 0,    p3: 0,    p4d: 0 } },
@@ -816,39 +816,44 @@ const ATRIAL_ION_CHANNELS = [
   { id: 'IKs',  label: 'IKs',  note: 'Slow delayed rectifier — joins IKr for repolarization', levels: { p4r: 0, p0: 0,    p1: 0.05, p2: 0.35, p3: 0.90, p4d: 0.10 } },
 ]
 
-// Always-visible glossary of every channel abbreviation used across the four
-// panels — the badges themselves stay compact (INa, IKr, …) so the row can't
-// grow past this small strip, but nobody should have to hover to learn what
-// an abbreviation stands for.
-const ION_CHANNEL_GLOSSARY = [
-  { id: 'If',    name: 'Funny current',              detail: 'HCN channels — the SA node’s pacemaker current' },
-  { id: 'ICa-T', name: 'T-type calcium current',      detail: 'activates near threshold, helps trigger SA upstroke' },
-  { id: 'ICa-L', name: 'L-type calcium current',      detail: 'SA node upstroke; the plateau current everywhere else' },
-  { id: 'IK / IK-ACh', name: 'Delayed rectifier / ACh-gated K⁺', detail: 'repolarizes the SA node; ACh (vagal) opens IK-ACh' },
-  { id: 'INa',   name: 'Fast sodium current',         detail: 'the rapid Phase 0 upstroke in atrium, ventricle, Purkinje' },
-  { id: 'IK1',   name: 'Inward rectifier K⁺',         detail: 'holds the resting potential; closes during the upstroke' },
-  { id: 'Ito',   name: 'Transient outward K⁺',        detail: 'brief Phase 1 notch right after the upstroke' },
-  { id: 'IKr',   name: 'Rapid delayed rectifier K⁺',  detail: 'drives Phase 3 repolarization (the hERG channel)' },
-  { id: 'IKs',   name: 'Slow delayed rectifier K⁺',   detail: 'joins IKr for Phase 3 repolarization' },
+// Keep current symbols and channel protein names visually distinct. The
+// molecular examples are intentionally family-level teaching labels.
+const CURRENT_CHANNEL_GLOSSARY = [
+  { id: 'If', name: 'Funny current', channel: 'HCN channels', detail: 'pacemaker depolarization' },
+  { id: 'ICa-T', name: 'T-type calcium current', channel: 'CaV3.x channels', detail: 'approach to nodal threshold' },
+  { id: 'ICa-L', name: 'L-type calcium current', channel: 'CaV1.x channels', detail: 'nodal upstroke and myocardial plateau' },
+  { id: 'IK / IK-ACh', name: 'Delayed rectifier and ACh-sensitive K⁺ currents', channel: 'delayed rectifier channels and GIRK channels', detail: 'nodal repolarization and vagal slowing' },
+  { id: 'INa', name: 'Fast sodium current', channel: 'NaV1.5 channels', detail: 'fast response Phase 0' },
+  { id: 'IK1', name: 'Inward rectifier potassium current', channel: 'Kir2.x channels', detail: 'stable resting potential' },
+  { id: 'Ito', name: 'Transient outward potassium current', channel: 'primarily Kv4.x channels', detail: 'Phase 1 notch' },
+  { id: 'IKr', name: 'Rapid delayed rectifier potassium current', channel: 'hERG or Kv11.1 channels', detail: 'Phase 3 repolarization' },
+  { id: 'IKs', name: 'Slow delayed rectifier potassium current', channel: 'Kv7.1 with KCNE1', detail: 'Phase 3 repolarization' },
 ]
 function IonChannelGlossary() {
   return (
     <div className="mt-2 rounded-xl border border-gray-800 bg-gray-900/60 p-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-        <h3 className="text-sm font-semibold text-gray-100">Ion channel key</h3>
+        <div>
+          <h3 className="text-sm font-semibold text-gray-100">Current and channel key</h3>
+          <p className="mt-0.5 text-xs text-gray-300"><span className="font-mono text-amber-300">I</span> symbols name currents. Channel names identify the membrane proteins that conduct them.</p>
+        </div>
         <div className="flex items-center gap-3 text-xs font-medium text-gray-200" aria-label="Current contribution color key">
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-600" />Minimal</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-cyan-400" />Contributing</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" />Dominant</span>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-1">
-        {ION_CHANNEL_GLOSSARY.map(ch => (
-          <div key={ch.id} className="flex items-baseline gap-2 text-xs">
-            <span className="font-mono text-amber-300 shrink-0 w-24">{ch.id}</span>
-            <span className="text-gray-300 leading-snug">
-              <span className="font-medium text-white">{ch.name}</span> — {ch.detail}
-            </span>
+      <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2 xl:grid-cols-3">
+        {CURRENT_CHANNEL_GLOSSARY.map(item => (
+          <div key={item.id} className="rounded-md border border-gray-800 bg-gray-950/40 px-2 py-1.5 text-xs">
+            <div className="flex items-baseline gap-2">
+              <span className="w-20 shrink-0 font-mono font-semibold text-amber-300">{item.id}</span>
+              <span className="font-medium text-white">{item.name}</span>
+            </div>
+            <div className="mt-0.5 pl-[5.5rem] leading-snug text-gray-300">
+              <span className="font-semibold text-cyan-300">Channel:</span> {item.channel}
+              <span className="text-gray-400"> · {item.detail}</span>
+            </div>
           </div>
         ))}
       </div>
