@@ -2,6 +2,7 @@
 import p5 from 'p5'
 import ModulePage from '../../components/ModulePage'
 import TeachingConductionAnimation from '../../components/TeachingConductionAnimation'
+import TeachingAnatomyDiagram from '../../components/TeachingAnatomyDiagram'
 import { getTeachingConductionStage } from '../../lib/teachingConduction'
 import HeartAnimation from '../../components/HeartAnimation'
 import { ECGVoltage, cycleVoltage, buildRhythmFromParams, meanQRSAxis } from '../../lib/ECGEngine'
@@ -328,7 +329,7 @@ function CanvasWrap({ containerRef, children }) {
 }
 function SimBar({ children }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-900/80 border-t border-gray-800 text-xs text-gray-500 flex-wrap">
+    <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-900/80 border-t border-gray-800 text-sm text-gray-300 flex-wrap">
       {children}
     </div>
   )
@@ -340,7 +341,7 @@ function Section({ label, title, subtitle, children }) {
         <span className="text-xs font-mono text-cyan-500 uppercase tracking-widest">{label}</span>
         <h2 className="text-base font-semibold text-white">{title}</h2>
       </div>
-      {subtitle && <p className="text-xs text-gray-400 mb-1.5 leading-snug">{subtitle}</p>}
+      {subtitle && <p className="text-sm text-gray-300 mb-2 leading-snug">{subtitle}</p>}
       {children}
     </div>
   )
@@ -355,7 +356,7 @@ function Callout({ children }) {
 function InfoRow({ label, value }) {
   return (
     <div className="flex gap-2 text-xs leading-relaxed mb-1.5">
-      <span className="text-gray-500 shrink-0 w-28">{label}</span>
+      <span className="text-gray-300 font-semibold shrink-0 w-32">{label}</span>
       <span className="text-gray-200">{value}</span>
     </div>
   )
@@ -381,16 +382,17 @@ function AnatomyDiagram({ selected, onSelect }) {
   const info = active ? ANATOMY[active] : null
 
   return (
-    <div className="flex gap-4 items-start">
+    <div className="flex flex-col gap-4 items-stretch xl:flex-row xl:items-start">
+      <TeachingAnatomyDiagram active={active} onSelect={onSelect} onHover={setHovered} />
       {/* SVG Heart */}
-      <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-3 shrink-0">
-        <svg viewBox="0 0 200 262" width="210" height="262" className="block">
+      <div className="hidden" aria-hidden="true">
+        <svg viewBox="0 0 200 262" width="240" height="314" className="block">
           {/* ── Non-interactive structure labels ── */}
-          <text x="100" y="8" textAnchor="middle" fill="#6b7280" fontSize="5">Patient's Right ← → Patient's Left</text>
+          <text x="100" y="8" textAnchor="middle" fill="#cbd5e1" fontSize="7">Patient's Right ← → Patient's Left</text>
 
           {/* Bachmann's bundle (non-interactive, dashed) */}
           <path d="M 76 22 Q 100 20 124 28" fill="none" stroke="#6b7280" strokeWidth="1.5" strokeDasharray="2,2" />
-          <text x="100" y="18" textAnchor="middle" fill="#6b7280" fontSize="4.5">Bachmann's bundle</text>
+          <text x="100" y="18" textAnchor="middle" fill="#cbd5e1" fontSize="7">Bachmann's bundle</text>
 
           {/* ── Right Atrium (viewer left = patient right) ── */}
           <path
@@ -400,7 +402,7 @@ function AnatomyDiagram({ selected, onSelect }) {
             strokeWidth="1.5"
             {...ev('ra')}
           />
-          <text x="76" y="60" textAnchor="middle" fill="#d1fae5" fontSize="6" pointerEvents="none">RA</text>
+          <text x="76" y="60" textAnchor="middle" fill="#d1fae5" fontSize="9" fontWeight="600" pointerEvents="none">RA</text>
 
           {/* ── Left Atrium (viewer right = patient left) ── */}
           <path
@@ -410,7 +412,7 @@ function AnatomyDiagram({ selected, onSelect }) {
             strokeWidth="1.5"
             {...ev('la')}
           />
-          <text x="120" y="60" textAnchor="middle" fill="#d1fae5" fontSize="6" pointerEvents="none">LA</text>
+          <text x="120" y="60" textAnchor="middle" fill="#d1fae5" fontSize="9" fontWeight="600" pointerEvents="none">LA</text>
 
           {/* ── SA Node (viewer left, patient right) ── */}
           <circle
@@ -420,7 +422,7 @@ function AnatomyDiagram({ selected, onSelect }) {
             strokeWidth="1.5"
             {...ev('sa')}
           />
-          <text x="70" y="20" textAnchor="middle" fill="#bfdbfe" fontSize="5" pointerEvents="none">SA</text>
+          <text x="70" y="20" textAnchor="middle" fill="#dbeafe" fontSize="7" fontWeight="600" pointerEvents="none">SA</text>
 
           {/* ── AV Node ── */}
           <circle
@@ -430,7 +432,7 @@ function AnatomyDiagram({ selected, onSelect }) {
             strokeWidth="1.5"
             {...ev('av')}
           />
-          <text x="100" y="99" textAnchor="middle" fill="#ede9fe" fontSize="5" pointerEvents="none">AV</text>
+          <text x="100" y="99" textAnchor="middle" fill="#f5f3ff" fontSize="7" fontWeight="600" pointerEvents="none">AV</text>
 
           {/* ── Bundle of His ── */}
           <line x1="100" y1="104" x2="100" y2="117"
@@ -438,7 +440,7 @@ function AnatomyDiagram({ selected, onSelect }) {
             {...ev('his')} style={{ cursor: 'pointer' }}
           />
           <rect x="88" y="104" width="24" height="13" fill="transparent" {...ev('his')} />
-          <text x="113" y="113" fill="#9ca3af" fontSize="4.5" pointerEvents="none">His</text>
+          <text x="113" y="113" fill="#e5e7eb" fontSize="7" fontWeight="600" pointerEvents="none">His</text>
 
           {/* ── Right Bundle Branch (viewer left) ── */}
           <path
@@ -448,7 +450,7 @@ function AnatomyDiagram({ selected, onSelect }) {
             strokeWidth="2"
             {...ev('rbundle')} style={{ cursor: 'pointer' }}
           />
-          <text x="58" y="138" fill="#9ca3af" fontSize="4.5" pointerEvents="none">RBB</text>
+          <text x="54" y="138" fill="#e5e7eb" fontSize="7" fontWeight="600" pointerEvents="none">RBB</text>
 
           {/* ── Left Bundle Branch (viewer right) ── */}
           <path
@@ -458,7 +460,7 @@ function AnatomyDiagram({ selected, onSelect }) {
             strokeWidth="2"
             {...ev('lbundle')} style={{ cursor: 'pointer' }}
           />
-          <text x="136" y="138" fill="#9ca3af" fontSize="4.5" pointerEvents="none">LBB</text>
+          <text x="136" y="138" fill="#e5e7eb" fontSize="7" fontWeight="600" pointerEvents="none">LBB</text>
 
           {/* ── Purkinje fan hints (apex region) ── */}
           <path d="M 62 170 Q 70 195 85 210 Q 95 222 100 228"
@@ -469,7 +471,7 @@ function AnatomyDiagram({ selected, onSelect }) {
             fill="none" stroke="#4b5563" strokeWidth="1" strokeDasharray="1.5,1.5"
             {...ev('purkinje')} style={{ cursor: 'pointer' }}
           />
-          <text x="100" y="240" textAnchor="middle" fill="#6b7280" fontSize="4.5" pointerEvents="none">Purkinje</text>
+          <text x="100" y="240" textAnchor="middle" fill="#e5e7eb" fontSize="7" fontWeight="600" pointerEvents="none">Purkinje</text>
 
           {/* ── Right Ventricle (viewer left) ── */}
           <path
@@ -479,7 +481,7 @@ function AnatomyDiagram({ selected, onSelect }) {
             strokeWidth="1.5"
             {...ev('rv')}
           />
-          <text x="64" y="168" textAnchor="middle" fill="#fed7aa" fontSize="6" pointerEvents="none">RV</text>
+          <text x="64" y="168" textAnchor="middle" fill="#ffedd5" fontSize="9" fontWeight="600" pointerEvents="none">RV</text>
 
           {/* ── Left Ventricle (viewer right) ── */}
           <path
@@ -489,7 +491,7 @@ function AnatomyDiagram({ selected, onSelect }) {
             strokeWidth="1.5"
             {...ev('lv')}
           />
-          <text x="136" y="168" textAnchor="middle" fill="#fed7aa" fontSize="6" pointerEvents="none">LV</text>
+          <text x="136" y="168" textAnchor="middle" fill="#ffedd5" fontSize="9" fontWeight="600" pointerEvents="none">LV</text>
 
           {/* ── Interventricular Septum ── */}
           <path
@@ -499,7 +501,7 @@ function AnatomyDiagram({ selected, onSelect }) {
             strokeWidth="1"
             {...ev('septum')}
           />
-          <text x="100" y="165" textAnchor="middle" fill="#7dd3fc" fontSize="4" pointerEvents="none">IVS</text>
+          <text x="100" y="165" textAnchor="middle" fill="#bae6fd" fontSize="6.5" fontWeight="600" pointerEvents="none">IVS</text>
         </svg>
       </div>
 
@@ -513,8 +515,8 @@ function AnatomyDiagram({ selected, onSelect }) {
           </div>
         ) : (
           <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 h-full flex flex-col justify-center text-center">
-            <p className="text-gray-500 text-sm">Hover or click a structure</p>
-            <p className="text-gray-600 text-xs mt-2">SA Node · RA · LA · AV Node · Bundle of His · Bundle Branches · Purkinje · RV · LV · Septum</p>
+            <p className="text-gray-100 text-base font-semibold">Hover or click a structure</p>
+            <p className="text-gray-300 text-sm mt-2 leading-relaxed">SA Node · RA · LA · AV Node · Bundle of His · Bundle Branches · Purkinje · RV · LV · Septum</p>
           </div>
         )}
       </div>
@@ -833,8 +835,8 @@ function IonChannelGlossary() {
   return (
     <div className="mt-2 rounded-xl border border-gray-800 bg-gray-900/60 p-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-        <h3 className="text-xs font-semibold text-gray-300">Ion channel key</h3>
-        <div className="flex items-center gap-3 text-[10px] text-gray-400" aria-label="Current contribution color key">
+        <h3 className="text-sm font-semibold text-gray-100">Ion channel key</h3>
+        <div className="flex items-center gap-3 text-xs font-medium text-gray-200" aria-label="Current contribution color key">
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-600" />Minimal</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-cyan-400" />Contributing</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" />Dominant</span>
@@ -844,8 +846,8 @@ function IonChannelGlossary() {
         {ION_CHANNEL_GLOSSARY.map(ch => (
           <div key={ch.id} className="flex items-baseline gap-2 text-xs">
             <span className="font-mono text-amber-300 shrink-0 w-24">{ch.id}</span>
-            <span className="text-gray-400 leading-snug">
-              <span className="text-gray-200">{ch.name}</span> — {ch.detail}
+            <span className="text-gray-300 leading-snug">
+              <span className="font-medium text-white">{ch.name}</span> — {ch.detail}
             </span>
           </div>
         ))}
@@ -889,12 +891,12 @@ function IonChannelRow({ clockRef, cycleMs, phases, channels }) {
   return (
     <div className="flex flex-wrap gap-1 px-3 py-1.5 border-t border-gray-800/70 bg-gray-950/40">
       {channels.map(ch => (
-        <div key={ch.id} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-gray-700/60" title={ch.note}>
+        <div key={ch.id} className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-gray-600/80" title={ch.note}>
           <span
             ref={el => { elRefs.current[ch.id] = el }}
             className="w-2 h-2 rounded-full bg-gray-600 transition-all duration-150"
           />
-          <span className="text-[10px] font-mono text-gray-300">{ch.label}</span>
+          <span className="text-xs font-mono font-medium text-gray-100">{ch.label}</span>
         </div>
       ))}
     </div>
@@ -919,7 +921,7 @@ function PhaseLabel({ clockRef, cycleMs, phases }) {
     rafId = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(rafId)
   }, [clockRef, cycleMs])
-  return <p ref={ref} className="text-[11px] text-cyan-300 font-mono px-3 pt-1 min-h-[14px] leading-snug" />
+  return <p ref={ref} className="text-xs text-cyan-200 font-mono px-3 pt-1 min-h-[18px] leading-snug" />
 }
 
 // One live panel = trace (TraceCanvas) + optional phase-number bands +
@@ -952,12 +954,12 @@ function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, co
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-900/60 overflow-hidden flex-1 min-w-0">
       <div className="px-3 pt-1.5 pb-0.5">
-        <div className="text-xs font-semibold text-gray-100 leading-snug">{title}</div>
-        <div className="text-[10px] text-gray-500 leading-snug">{sub}</div>
+        <div className="text-sm font-semibold text-gray-100 leading-snug">{title}</div>
+        <div className="text-xs font-medium text-gray-300 leading-snug">{sub}</div>
       </div>
       <div className="flex items-baseline justify-between px-3 pb-0.5">
-        <span className="text-[10px] font-semibold" style={{ color }}>Membrane Potential (mV)</span>
-        <span className="text-[9px] text-gray-600">Intracellular membrane potential</span>
+        <span className="text-xs font-semibold" style={{ color }}>Membrane Potential (mV)</span>
+        <span className="text-xs text-gray-300">Intracellular membrane potential</span>
       </div>
       <TraceCanvas
         clockRef={clockRef}
@@ -974,8 +976,8 @@ function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, co
       {mechanics ? (
         <div className="border-t border-gray-800 bg-gray-950/35">
           <div className="flex items-baseline justify-between px-3 pt-2 pb-0.5">
-            <span className="text-[10px] font-semibold text-cyan-300">Relative cytosolic Ca²⁺</span>
-            <span className="text-[9px] text-gray-600">Ca²⁺ induced Ca²⁺ release</span>
+            <span className="text-xs font-semibold text-cyan-200">Relative cytosolic Ca²⁺</span>
+            <span className="text-xs text-gray-300">Ca²⁺ induced Ca²⁺ release</span>
           </div>
           <TraceCanvas
             clockRef={clockRef}
@@ -986,8 +988,8 @@ function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, co
             height={74}
           />
           <div className="flex items-baseline justify-between px-3 pt-1.5 pb-0.5">
-            <span className="text-[10px] font-semibold text-rose-300">Relative twitch force</span>
-            <span className="text-[9px] text-gray-600">Peak {Math.round(mechanics.forcePeak * 100)}%</span>
+            <span className="text-xs font-semibold text-rose-200">Relative twitch force</span>
+            <span className="text-xs font-medium text-gray-200">Peak {Math.round(mechanics.forcePeak * 100)}%</span>
           </div>
           <TraceCanvas
             clockRef={clockRef}
@@ -997,12 +999,12 @@ function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, co
             color="#fb7185"
             height={74}
           />
-          <p className="px-3 py-2 text-[10px] text-gray-500 leading-relaxed">
+          <p className="px-3 py-2 text-xs text-gray-300 leading-relaxed">
             Calcium rises after L type channels open. Force follows after a short delay as calcium binds troponin and activates cross bridges.
           </p>
         </div>
       ) : (
-        <p className="px-3 py-2 border-t border-gray-800 text-[10px] text-gray-600 leading-relaxed">
+        <p className="px-3 py-2 border-t border-gray-800 text-xs font-medium text-gray-300 leading-relaxed">
           Specialized electrical tissue: pumping force is not displayed.
         </p>
       )}
@@ -1050,18 +1052,18 @@ function ConductionPathway() {
       <div className="flex flex-wrap items-center gap-1.5" aria-label="Normal cardiac conduction sequence">
         {CONDUCTION_PATHWAY.map((item, index) => (
           <span key={item.label} className="contents">
-            <span className={`rounded-md border px-2 py-1 text-[10px] font-medium ${
+            <span className={`rounded-md border px-2 py-1 text-xs font-semibold ${
               item.shown
                 ? 'border-emerald-700/60 bg-emerald-950/50 text-emerald-300'
-                : 'border-gray-700 bg-gray-950/50 text-gray-400'
+                : 'border-gray-600 bg-gray-950/50 text-gray-200'
             }`}>
               {item.label}
             </span>
-            {index < CONDUCTION_PATHWAY.length - 1 && <span className="text-gray-600" aria-hidden="true">→</span>}
+            {index < CONDUCTION_PATHWAY.length - 1 && <span className="font-bold text-gray-300" aria-hidden="true">→</span>}
           </span>
         ))}
       </div>
-      <p className="mt-1.5 text-[10px] leading-relaxed text-gray-500">
+      <p className="mt-2 text-xs leading-relaxed text-gray-300">
         Green structures have traces below. AV node, His bundle, and bundle branches remain in the pathway even though separate traces are not shown.
       </p>
     </div>
@@ -1129,7 +1131,7 @@ function LiveActionPotentials() {
       </div>
 
       <ConductionPathway />
-      <p className="text-[11px] text-gray-500 mb-1.5">
+      <p className="text-xs text-gray-300 mb-2 leading-relaxed">
         The shared cursor reveals sequence as well as shape. Purkinje fibers depolarize after conduction through the
         AV node, His bundle, and bundle branches, then rapidly deliver excitation to ventricular myocytes.
       </p>
@@ -1184,7 +1186,7 @@ function LiveActionPotentials() {
           aria-label="Cardiac cycle time"
           className="flex-1 min-w-[120px] accent-emerald-500"
         />
-        <span className="text-xs font-mono text-gray-500 tabular-nums w-28">{Math.round(tMs)} / {Math.round(phys.cycleMs)} ms</span>
+        <span className="text-xs font-mono font-medium text-gray-200 tabular-nums w-28">{Math.round(tMs)} / {Math.round(phys.cycleMs)} ms</span>
         <div className="flex items-center gap-1">
           {SPEEDS.map(s => (
             <button
@@ -1193,7 +1195,7 @@ function LiveActionPotentials() {
               className={`px-2.5 py-1.5 rounded-lg text-xs font-mono border transition-colors ${
                 speed === s
                   ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/50'
-                  : 'bg-gray-800 text-gray-500 border-gray-700 hover:text-gray-300'
+                  : 'bg-gray-800 text-gray-200 border-gray-600 hover:text-white'
               }`}
             >
               {s}×
@@ -1245,7 +1247,7 @@ function LiveActionPotentials() {
         <div className="flex flex-wrap items-center gap-3 mt-2 px-3 py-1.5 rounded-lg bg-gray-950/50 border border-gray-800">
           <span className="text-xs text-gray-400">AV node conduction delay</span>
           <span className="text-sm font-mono text-amber-300">Δt ≈ {phys.avDelayMs} ms</span>
-          <span className="text-[11px] text-gray-600">Time available for atrial contraction and ventricular filling.</span>
+          <span className="text-xs font-medium text-gray-300">Time available for atrial contraction and ventricular filling.</span>
         </div>
         {phys.bothElevated && (
           <div className="mt-1.5 px-3 py-1 rounded-lg bg-purple-950/40 border border-purple-700/40 text-xs text-purple-300">
@@ -1267,7 +1269,7 @@ function LiveActionPotentials() {
             <div className="h-1.5 rounded-full bg-gray-800 mt-1 overflow-hidden">
               <div className="h-full transition-all" style={{ width: `${kPct}%`, backgroundColor: kBarColor(kMEqL) }} />
             </div>
-            <p className="text-[10px] text-gray-600 mt-1">Normal range 3.5–5.0 mEq/L</p>
+            <p className="text-xs font-medium text-gray-300 mt-1">Normal range 3.5–5.0 mEq/L</p>
           </div>
           <LabeledSlider
             label="Extracellular [Ca²⁺]" value={caMgDl} min={5.0} max={15.0} step={0.1}
@@ -1319,7 +1321,7 @@ function LiveActionPotentials() {
       </div>
 
       {/* Intracellular and mechanical teaching signals only */}
-      <p className="mt-2 text-[11px] text-gray-600 text-center leading-relaxed">
+      <p className="mt-2 text-xs font-medium text-gray-300 text-center leading-relaxed">
         Membrane potential requires an intracellular electrode. Calcium and force are normalized teaching-model outputs, not clinical measurements.
       </p>
     </div>
@@ -2002,28 +2004,28 @@ function ConductionSection({ rhythm }) {
 
         <div className="flex-1 min-w-0 space-y-3">
           <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-4 min-h-[166px]">
-            <div className="text-[10px] uppercase tracking-wider text-cyan-400 mb-1">Current stage</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-cyan-300 mb-1">Current stage</div>
             <div className="text-lg font-semibold text-white min-h-[28px]">{stage.label}</div>
-            <div className="mt-3 text-[10px] uppercase tracking-wider text-gray-500">Participating structures</div>
+            <div className="mt-3 text-xs font-semibold uppercase tracking-wider text-gray-300">Participating structures</div>
             <div className="mt-1 text-sm text-emerald-300 min-h-[20px]">{stage.structures}</div>
             <div className="mt-3 min-h-[44px]">
-              <p className="text-xs text-gray-400 leading-relaxed">{stage.note}</p>
+              <p className="text-sm text-gray-200 leading-relaxed">{stage.note}</p>
             </div>
           </div>
 
           <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-3">
-            <div className="text-xs text-gray-500 mb-2 font-mono uppercase tracking-wider">Conduction velocity reference</div>
-            <table className="w-full text-xs">
+            <div className="text-xs font-semibold text-gray-300 mb-2 font-mono uppercase tracking-wider">Conduction velocity reference</div>
+            <table className="w-full text-sm">
               <tbody>
                 {velTable.map(row => (
-                  <tr key={row.struct} className={activeVelocityRows.includes(row.struct) ? 'text-cyan-300' : 'text-gray-400'}>
+                  <tr key={row.struct} className={activeVelocityRows.includes(row.struct) ? 'font-semibold text-cyan-200' : 'text-gray-200'}>
                     <td className="py-0.5 pr-3">{row.struct}</td>
                     <td className="py-0.5 font-mono text-right">{row.cv}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <p className="mt-2 border-t border-gray-800 pt-2 text-[10px] leading-relaxed text-gray-600">
+            <p className="mt-2 border-t border-gray-700 pt-2 text-xs leading-relaxed text-gray-300">
               Reference ranges describe tissue conduction. Pixel distance and animation speed do not represent measured velocity.
             </p>
           </div>
@@ -2050,7 +2052,7 @@ function ConductionSection({ rhythm }) {
         >
           Reset
         </button>
-          <span className="ml-auto text-xs font-mono text-gray-500 tabular-nums">{Math.round(tMs)} / {Math.round(cycleMs)} ms</span>
+          <span className="ml-auto text-xs font-mono font-medium text-gray-200 tabular-nums">{Math.round(tMs)} / {Math.round(cycleMs)} ms</span>
         </div>
 
         <div className="mt-3">
@@ -2063,7 +2065,7 @@ function ConductionSection({ rhythm }) {
             aria-label="Cardiac conduction sequence time"
             className="w-full accent-cyan-500"
         />
-          <div className="relative mt-1 hidden h-7 text-[9px] leading-tight text-gray-500 sm:block">
+          <div className="relative mt-2 hidden h-8 text-xs font-medium leading-tight text-gray-300 sm:block">
             {[
               ['Atrial activation', '11.8%'],
               ['AV delay', '26%'],
@@ -2079,7 +2081,7 @@ function ConductionSection({ rhythm }) {
         </div>
       </div>
 
-      <div className="mt-3 rounded-lg border border-amber-700/35 bg-amber-950/20 px-3 py-2 text-[11px] leading-relaxed text-amber-200/90">
+      <div className="mt-3 rounded-lg border border-amber-600/60 bg-amber-950/20 px-3 py-2 text-sm leading-relaxed text-amber-100">
         <strong>Teaching schematic:</strong> The sequence and major directions are physiologically guided. Shapes, distances,
         front positions, and elapsed screen time are not a quantitative activation map.
       </div>

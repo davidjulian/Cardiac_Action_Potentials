@@ -165,9 +165,9 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
         </g>
 
         {/* Labels are few and large enough to reinforce the pathway. */}
-        <g fill="#c4cad4" fontSize="10" fontFamily="system-ui, sans-serif">
-          <text x="16" y="20" fill="#737b89">Patient’s right ←</text>
-          <text x="280" y="42" fill="#737b89">→ Patient’s left</text>
+        <g fill="#e5e7eb" fontSize="12" fontWeight="600" fontFamily="system-ui, sans-serif">
+          <text x="16" y="20" fill="#cbd5e1">Patient’s right ←</text>
+          <text x="268" y="58" fill="#cbd5e1">→ Patient’s left</text>
           <text x="77" y="82">SA node</text>
           <text x="101" y="178">RA</text>
           <text x="263" y="168">LA</text>
@@ -177,13 +177,13 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
           <text x="278" y="397">LV</text>
         </g>
 
-        <g transform="translate(16 414)" fontFamily="system-ui, sans-serif" fontSize="9">
-          <circle cx="5" cy="0" r="5" fill="#fde047" /><text x="15" y="3" fill="#c4cad4">depolarizing front</text>
-          <rect x="120" y="-5" width="10" height="10" rx="2" fill="#e96b50" /><text x="137" y="3" fill="#c4cad4">depolarized</text>
-          <circle cx="224" cy="0" r="5" fill="#38bdf8" /><text x="234" y="3" fill="#c4cad4">repolarizing</text>
+        <g transform="translate(16 414)" fontFamily="system-ui, sans-serif" fontSize="11" fontWeight="600">
+          <circle cx="5" cy="0" r="5" fill="#fde047" /><text x="15" y="4" fill="#e5e7eb">depolarizing front</text>
+          <rect x="128" y="-5" width="10" height="10" rx="2" fill="#e96b50" /><text x="145" y="4" fill="#e5e7eb">depolarized</text>
+          <circle cx="240" cy="0" r="5" fill="#38bdf8" /><text x="250" y="4" fill="#e5e7eb">repolarizing</text>
         </g>
       </svg>
-      <div className="absolute right-2 top-2 rounded-md border border-gray-700 bg-gray-950/85 px-2 py-1 text-[9px] font-medium uppercase tracking-wide text-gray-400">
+      <div className="absolute right-2 top-2 rounded-md border border-gray-600 bg-gray-950/90 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-200">
         Schematic · not to scale
       </div>
     </div>

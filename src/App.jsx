@@ -20,13 +20,13 @@ function LabSidebar({ onOpenAbout }) {
           </svg>
           <span className="text-gray-100 text-sm font-semibold">Cardiac AP Lab</span>
         </div>
-        <p className="text-xs text-gray-500 leading-relaxed">
+        <p className="text-sm text-gray-300 leading-relaxed">
           Intracellular electrophysiology, excitation contraction coupling, and conduction
         </p>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Laboratory sections">
-        <p className="px-2 mb-2 text-[10px] uppercase tracking-widest text-gray-600">Explore</p>
+        <p className="px-2 mb-2 text-xs font-semibold uppercase tracking-widest text-gray-300">Explore</p>
         <div className="space-y-1">
           {tabInfo?.tabs.map(tab => {
             const active = tab.id === tabInfo.active
@@ -43,7 +43,7 @@ function LabSidebar({ onOpenAbout }) {
                 }`}
               >
                 <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono ${
-                  active ? 'bg-emerald-900/70 text-emerald-200' : 'bg-gray-800 text-gray-500'
+                  active ? 'bg-emerald-900/70 text-emerald-200' : 'bg-gray-800 text-gray-300'
                 }`}>
                   {tab.id}
                 </span>
@@ -58,7 +58,7 @@ function LabSidebar({ onOpenAbout }) {
       </nav>
 
       <div className="px-5 py-4 border-t border-gray-800">
-        <p className="text-[11px] text-gray-600 leading-relaxed">
+        <p className="text-xs text-gray-300 leading-relaxed">
           Keep this app open beside the Canvas activity. Your quiz supplies the questions and explanations.
         </p>
         <button
@@ -103,7 +103,7 @@ function AboutModal({ onClose }) {
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
               About
             </p>
             <h2 id="about-title" className="mt-1 text-xl font-semibold text-gray-100">
@@ -122,12 +122,12 @@ function AboutModal({ onClose }) {
         </div>
 
         <div className="mt-5 rounded-xl border border-emerald-900/70 bg-emerald-950/30 p-4">
-          <p className="text-sm text-gray-400">Primary developer</p>
+          <p className="text-sm font-medium text-gray-200">Primary developer</p>
           <p className="mt-1 text-lg font-semibold text-emerald-300">Jacob Walker</p>
           <p className="text-sm text-gray-300">UF Biomedical Engineering, Class of 2027</p>
         </div>
 
-        <p className="mt-5 text-sm leading-relaxed text-gray-400">
+        <p className="mt-5 text-sm leading-relaxed text-gray-200">
           This interactive teaching app supports exploration of cardiac anatomy,
           action potentials, excitation contraction coupling, and conduction.
         </p>
