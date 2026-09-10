@@ -22,14 +22,14 @@ const ANATOMY = {
     name: 'SA Node (Sinoatrial Node)',
     apType: 'sa',
     fn: 'Primary pacemaker — spontaneously depolarizes 60–100 times per minute without external stimulus. Located at the junction of the superior vena cava and the right atrium.',
-    electrical: 'During Phase 4, HCN channels conduct If and T-type calcium channels conduct ICa-T. The cell has no stable resting potential. L-type calcium channels conduct the ICa-L that drives the upstroke, rather than fast INa. The slope of Phase 4 helps determine heart rate.',
+    electrical: 'During Phase 4, HCN channels conduct I_f and T-type calcium channels conduct I_Ca,T. The cell has no stable resting potential. L-type calcium channels conduct I_Ca,L, which drives the upstroke, rather than fast I_Na. The slope of Phase 4 helps determine heart rate.',
     ECG: 'Not directly visible on surface ECG. Its firing initiates the P wave, but the SA node signal is too small. Dysfunction manifests as sinus bradycardia, sick sinus syndrome, or sinus arrest.',
   },
   ra: {
     name: 'Right Atrium',
     apType: 'myocyte',
     fn: 'Receives deoxygenated blood from the superior and inferior vena cava and coronary sinus. Contracts to complete ventricular filling (atrial kick).',
-    electrical: 'Fast-response myocyte with prominent Phase 0 INa upstroke. Conduction from SA node spreads at ~1 m/s. Refractory period shorter than ventricles, enabling rapid atrial rhythms.',
+    electrical: 'Fast-response myocyte with prominent Phase 0 I_Na upstroke. Conduction from SA node spreads at ~1 m/s. Refractory period shorter than ventricles, enabling rapid atrial rhythms.',
     ECG: 'Initial (first half) of the P wave. Right atrial enlargement prolongs or widens the early P wave. Depolarizes slightly before left atrium.',
   },
   la: {
@@ -43,14 +43,14 @@ const ANATOMY = {
     name: 'AV Node (Atrioventricular Node)',
     apType: 'sa',
     fn: 'The only normal electrical bridge between atria and ventricles (AV annulus is otherwise electrically insulating). Imposes a 120–200 ms delay — critical for allowing ventricular filling before systole.',
-    electrical: 'Slow-response cells like SA node: upstroke via ICa-L, no fast INa. Conduction velocity only 0.05 m/s — the slowest in the heart. Heavily innervated by both vagal (slows) and sympathetic (accelerates) fibers. Site of most Wenckebach and complete heart block.',
+    electrical: 'Slow-response cells like SA node: upstroke via I_Ca,L, no fast I_Na. Conduction velocity only 0.05 m/s — the slowest in the heart. Heavily innervated by both vagal (slows) and sympathetic (accelerates) fibers. Site of most Wenckebach and complete heart block.',
     ECG: 'Responsible for the PR interval. AV nodal delay = isoelectric PR segment. First-degree block = PR > 200 ms. Third-degree block = complete dissociation of P waves and QRS complexes.',
   },
   his: {
     name: 'Bundle of His',
     apType: 'purkinje',
     fn: 'Exits the AV node and penetrates the fibrous skeleton of the heart, dividing into left and right bundle branches. Rapid conduction ensures synchronous ventricular activation.',
-    electrical: 'Purkinje-type: fast INa upstroke, very rapid conduction (1–2 m/s), long plateau phase. His bundle recording (catheter lab) confirms whether block is above or below the bundle.',
+    electrical: 'Purkinje-type: fast I_Na upstroke, very rapid conduction (1–2 m/s), long plateau phase. His bundle recording (catheter lab) confirms whether block is above or below the bundle.',
     ECG: 'Not directly visible. Conduction through His-Purkinje system forms the early part of the QRS complex. His-Purkinje disease → wide QRS, bundle branch blocks.',
   },
   rbundle: {
@@ -125,87 +125,87 @@ const PK_AP = [
 const SA_PHASES = [
   {
     id: 'p4', label: 'Phase 4 — Pacemaker Potential', tRange: [0, 0.68],
-    channels: 'If (HCN channels) + ICa-T',
-    ions: 'Na⁺ and K⁺ slowly IN via If ("funny" current); Ca²⁺ via T-type channels → gradual depolarization −62→−40 mV. No stable resting potential. Slope of this ramp sets heart rate. Sympathetic ↑ slope (faster); vagal ↓ slope (slower).',
+    channels: 'I_f (HCN channels) + I_Ca,T',
+    ions: 'Na⁺ and K⁺ slowly enter via I_f ("funny" current); Ca²⁺ enters via T-type channels → gradual depolarization −62→−40 mV. No stable resting potential. Slope of this ramp sets heart rate. Sympathetic ↑ slope (faster); vagal ↓ slope (slower).',
   },
   {
-    id: 'p0', label: 'Upstroke (ICa-L driven)', tRange: [0.68, 0.78],
-    channels: 'ICa-L — NO fast INa',
-    ions: 'Ca²⁺ in via L-type channels → slow, rounded upstroke to ~+16 mV. Much slower than ventricular upstroke (no INa). This makes SA node conduction inherently slow.',
+    id: 'p0', label: 'Upstroke (I_Ca,L driven)', tRange: [0.68, 0.78],
+    channels: 'I_Ca,L — NO fast I_Na',
+    ions: 'Ca²⁺ in via L-type channels → slow, rounded upstroke to ~+16 mV. Much slower than ventricular upstroke (no I_Na). This makes SA node conduction inherently slow.',
   },
   {
     id: 'repol', label: 'Repolarization', tRange: [0.78, 1.0],
-    channels: 'IK (delayed rectifier) + IK-ACh',
-    ions: 'K⁺ exits via delayed rectifiers and acetylcholine-gated channels. Membrane returns to −62 mV to begin next pacemaker cycle. IK-ACh allows vagal nerve to hyperpolarize and slow pacemaking.',
+    channels: 'I_K (delayed rectifier) + I_K,ACh',
+    ions: 'K⁺ exits via delayed rectifiers and acetylcholine-gated channels. Membrane returns to −62 mV to begin next pacemaker cycle. I_K,ACh allows vagal input to hyperpolarize and slow pacemaking.',
   },
 ]
 const MYO_PHASES = [
   {
     id: 'p4r', label: 'Phase 4 — Resting Potential', tRange: [0, 0.182],
-    channels: 'IK1 (inward rectifier)',
-    ions: 'K⁺ outward via IK1 → stable resting potential of −90 mV. Stable until external depolarization (from Purkinje fibers or adjacent myocytes).',
+    channels: 'I_K1 (inward rectifier)',
+    ions: 'K⁺ outward via I_K1 → stable resting potential of −90 mV. Stable until external depolarization (from Purkinje fibers or adjacent myocytes).',
   },
   {
     id: 'p0', label: 'Phase 0 — Fast Upstroke', tRange: [0.182, 0.207],
-    channels: 'INa (fast voltage-gated Na⁺)',
+    channels: 'I_Na (fast voltage-gated Na⁺)',
     ions: 'Na⁺ rushes in through fast channels → −90→+30 mV in ~1–2 ms. Largest and fastest current. Threshold ~−65 mV. Rate of rise (dV/dt max) determines conduction velocity.',
   },
   {
     id: 'p1', label: 'Phase 1 — Early Repolarization', tRange: [0.207, 0.225],
-    channels: 'Ito (transient outward K⁺)',
-    ions: 'K⁺ briefly exits via Ito → creates "notch" between upstroke and plateau. More prominent in epicardium than endocardium → transmural voltage gradient contributes to T wave polarity.',
+    channels: 'I_to (transient outward K⁺)',
+    ions: 'K⁺ briefly exits via I_to → creates "notch" between upstroke and plateau. More prominent in epicardium than endocardium → transmural voltage gradient contributes to T wave polarity.',
   },
   {
     id: 'p2', label: 'Phase 2 — Plateau', tRange: [0.225, 0.480],
-    channels: 'ICa-L (in) balanced vs IKr + IKs (out)',
+    channels: 'I_Ca,L (in) balanced vs I_Kr + I_Ks (out)',
     ions: 'Ca²⁺ in BALANCED by K⁺ out → plateau ~0–10 mV for ~200 ms. Ca²⁺ influx triggers Ca²⁺-induced Ca²⁺ release (CICR) from SR → contraction. Plateau prevents re-excitation (refractory period = mechanical protection).',
   },
   {
     id: 'p3', label: 'Phase 3 — Rapid Repolarization', tRange: [0.480, 0.580],
-    channels: 'IKr + IKs (rapid + slow delayed rectifiers)',
-    ions: 'ICa-L inactivates; IKr/IKs dominate → K⁺ exits rapidly → rapid return to −90 mV. hERG (Kv11.1) channels are major molecular contributors to IKr and are targets of many drugs that can prolong QT.',
+    channels: 'I_Kr + I_Ks (rapid + slow delayed rectifiers)',
+    ions: 'I_Ca,L inactivates; I_Kr/I_Ks dominate → K⁺ exits rapidly → rapid return to −90 mV. hERG (Kv11.1) channels are major molecular contributors to I_Kr and are targets of many drugs that can prolong QT.',
   },
   {
     id: 'p4d', label: 'Phase 4 — Electrical Diastole', tRange: [0.580, 1.0],
-    channels: 'IK1 (inward rectifier)',
-    ions: 'IK1 maintains stable −90 mV. No spontaneous depolarization (unlike SA node) — requires external stimulus to fire again.',
+    channels: 'I_K1 (inward rectifier)',
+    ions: 'I_K1 maintains stable −90 mV. No spontaneous depolarization (unlike SA node) — requires external stimulus to fire again.',
   },
 ]
 const PK_PHASES = [
   {
     id: 'p4r', label: 'Phase 4 — Resting / Pacemaker', tRange: [0, 0.182],
-    channels: 'IK1 + slow If',
-    ions: 'Normally IK1 holds −92 mV. If SA/AV fail, slow If activates → spontaneous depolarization at 20–40 bpm (escape rhythm). Most negative resting potential in heart.',
+    channels: 'I_K1 + slow I_f',
+    ions: 'Normally I_K1 holds −92 mV. If SA/AV fail, slow I_f activates → spontaneous depolarization at 20–40 bpm (escape rhythm). Most negative resting potential in heart.',
   },
   {
     id: 'p0', label: 'Phase 0 — Fastest Upstroke', tRange: [0.182, 0.203],
-    channels: 'INa (fast) — highest dV/dt in heart',
+    channels: 'I_Na (fast) — highest dV/dt in heart',
     ions: 'Na⁺ rushes in → fastest dV/dt of any cardiac cell (~900 V/s). −92→+38 mV. Enables extremely fast conduction (2–4 m/s) to activate ventricles nearly simultaneously.',
   },
   {
     id: 'p1', label: 'Phase 1 — Early Repolarization', tRange: [0.203, 0.225],
-    channels: 'Ito',
+    channels: 'I_to',
     ions: 'K⁺ briefly exits via transient outward → notch. Similar to myocyte but slightly more pronounced.',
   },
   {
     id: 'p2', label: 'Phase 2 — Longest Plateau', tRange: [0.225, 0.540],
-    channels: 'ICa-L vs IKr + IKs',
-    ions: 'Longest plateau of any cardiac cell (~300 ms). ICa-L in balanced by K⁺ out. Extended refractory period → protects against rapid ventricular rates. EADs and DADs most common here.',
+    channels: 'I_Ca,L vs I_Kr + I_Ks',
+    ions: 'Longest plateau of any cardiac cell (~300 ms). I_Ca,L inward current is balanced by K⁺ outward current. Extended refractory period → protects against rapid ventricular rates. EADs and DADs most common here.',
   },
   {
     id: 'p3', label: 'Phase 3 — Rapid Repolarization', tRange: [0.540, 0.690],
-    channels: 'IKr + IKs dominant',
-    ions: 'Rapid return to −92 mV as IKr/IKs dominate. Longest AP duration → last to repolarize → determines QT interval in part.',
+    channels: 'I_Kr + I_Ks dominant',
+    ions: 'Rapid return to −92 mV as I_Kr/I_Ks dominate. Longest AP duration → last to repolarize → determines QT interval in part.',
   },
   {
     id: 'p4d', label: 'Phase 4 — Electrical Diastole', tRange: [0.690, 1.0],
-    channels: 'IK1 (± slow If)',
-    ions: 'IK1 stabilizes at −92 mV. Latent automaticity: slow If may gradually depolarize if dominant pacemakers fail. Site of DAD-triggered arrhythmias (digitalis toxicity, Ca²⁺ overload).',
+    channels: 'I_K1 (± slow I_f)',
+    ions: 'I_K1 stabilizes at −92 mV. Latent automaticity: slow I_f may gradually depolarize if dominant pacemakers fail. Site of DAD-triggered arrhythmias (digitalis toxicity, Ca²⁺ overload).',
   },
 ]
 
 // ── AP data for 2C (Intracellular vs ECG) ──────────────────────────────────
-// Atrial myocyte: fast INa upstroke like MYO_AP, but a much briefer plateau
+// Atrial myocyte: fast sodium upstroke like MYO_AP, but a much briefer plateau
 // and faster repolarization (real atrial APD ≈ 150-200 ms vs ventricular
 // ≈ 300 ms) — the key shape difference the spec asks students to notice.
 const ATRIAL_AP = [
@@ -217,17 +217,17 @@ const ATRIAL_AP = [
 ]
 const ATRIAL_PHASES = [
   { id: 'p4r', label: 'Phase 4 — Resting Potential', tRange: [0, 0.182],
-    channels: 'IK1', ions: 'Stable resting potential ≈ −80 mV — slightly less negative than ventricular myocardium.' },
+    channels: 'I_K1', ions: 'Stable resting potential ≈ −80 mV — slightly less negative than ventricular myocardium.' },
   { id: 'p0', label: 'Phase 0 — Fast Upstroke', tRange: [0.182, 0.207],
-    channels: 'INa (fast voltage-gated Na⁺)', ions: 'Fast Na⁺-driven upstroke, same mechanism as ventricle, smaller amplitude.' },
+    channels: 'I_Na (fast voltage gated Na⁺ channels)', ions: 'Fast Na⁺ driven upstroke, same mechanism as ventricle, smaller amplitude.' },
   { id: 'p1', label: 'Phase 1 — Early Repolarization', tRange: [0.207, 0.225],
-    channels: 'Ito', ions: 'Brief transient outward K⁺ notch.' },
+    channels: 'I_to', ions: 'Brief transient outward K⁺ notch.' },
   { id: 'p2', label: 'Phase 2 — Brief Plateau', tRange: [0.225, 0.34],
-    channels: 'ICa-L vs IKr + IKs', ions: 'Much shorter plateau than ventricular myocardium → shorter refractory period → atria can be driven at much faster rates (flutter, fibrillation).' },
+    channels: 'I_Ca,L vs I_Kr + I_Ks', ions: 'Much shorter plateau than ventricular myocardium → shorter refractory period → atria can be driven at much faster rates (flutter, fibrillation).' },
   { id: 'p3', label: 'Phase 3 — Rapid Repolarization', tRange: [0.34, 0.45],
-    channels: 'IKr + IKs', ions: 'Rapid return to resting potential.' },
+    channels: 'I_Kr + I_Ks', ions: 'Rapid return to resting potential.' },
   { id: 'p4d', label: 'Phase 4 — Electrical Diastole', tRange: [0.45, 1.0],
-    channels: 'IK1', ions: 'Stable at rest until the next wavefront arrives.' },
+    channels: 'I_K1', ions: 'Stable at rest until the next wavefront arrives.' },
 ]
 
 // Where each region's own upstroke lands on the SHARED real-time axis this
@@ -251,13 +251,13 @@ const VENTRICULAR_ANIM_DELAY_MS = 40
 
 const AP_REGIONS = [
   { key: 'sa', label: 'SA Node', data: SA_AP, phases: SA_PHASES, anchorFraction: 0.68, targetMs: 0,
-    desc: 'Slow spontaneous pacemaker potential (If + ICa-L). Threshold ≈ −40 mV. No fast upstroke — this cell drives its own rate.' },
+    desc: 'Slow spontaneous pacemaker potential (I_f + I_Ca,L). Threshold ≈ −40 mV. No fast upstroke — this cell drives its own rate.' },
   { key: 'atrium', label: 'Atrium', data: ATRIAL_AP, phases: ATRIAL_PHASES, anchorFraction: 0.182, targetMs: 10,
-    desc: 'Fast upstroke (INa), brief plateau, rapid repolarization.' },
+    desc: 'Fast upstroke (I_Na), brief plateau, rapid repolarization.' },
   { key: 'av', label: 'AV Node', data: SA_AP, phases: SA_PHASES, anchorFraction: 0.68, targetMs: Math.round(QRS_ONSET_MS * 0.72),
-    desc: 'Slow-response cell like the SA node — ICa-L upstroke, no fast INa — but fires mid-way through the PR segment, imposing the AV delay.' },
+    desc: 'Slow response cell like the SA node — I_Ca,L upstroke, no fast I_Na — but fires midway through the PR segment, imposing the AV delay.' },
   { key: 'ventricle', label: 'Ventricle', data: MYO_AP, phases: MYO_PHASES, anchorFraction: 0.182, targetMs: QRS_ONSET_MS + VENTRICULAR_ANIM_DELAY_MS,
-    desc: 'Fast upstroke (Phase 0), long plateau (Phase 2, ICa-L), Phases 0–4 labeled below.' },
+    desc: 'Fast upstroke (Phase 0), long plateau (Phase 2, I_Ca,L), Phases 0–4 labeled below.' },
   { key: 'purkinje', label: 'Purkinje', data: PK_AP, phases: PK_PHASES, anchorFraction: 0.182, targetMs: QRS_ONSET_MS + VENTRICULAR_ANIM_DELAY_MS - 15,
     desc: 'Fastest upstroke and longest plateau of any cardiac cell — fires just ahead of ventricular myocardium.' },
 ]
@@ -303,7 +303,7 @@ const STRUCT_CV = {
   repolLV: '—', repolRV: '—',
 }
 const STRUCT_NOTE = {
-  sa: 'SA node fires spontaneously as If conducted through HCN channels helps drive Phase 4. Rate is governed by the slope of the pacemaker potential. Not visible on surface ECG directly.',
+  sa: 'SA node fires spontaneously as I_f, conducted through HCN channels, helps drive Phase 4. Rate is governed by the slope of the pacemaker potential. Not visible on surface ECG directly.',
   ra: 'Atrial myocardium conducting at ~1 m/s. Right atrium activates first → initial P wave.',
   la: "Left atrium activates via Bachmann's bundle. Terminal P wave. Enlargement → P mitrale.",
   bachmann: "Interatrial conduction pathway connecting RA to LA at ~1 m/s. Failure → ectopic atrial rhythms.",
@@ -611,6 +611,26 @@ function computeAPPhysiology({ sympathetic, parasympathetic, kMEqL, caMgDl }) {
   }
 }
 
+const BASELINE_AP_PHYSIOLOGY = computeAPPhysiology({
+  sympathetic: 20,
+  parasympathetic: 20,
+  kMEqL: 4.0,
+  caMgDl: 9.5,
+})
+
+function phase4SlopeMvPerSecond(node, cycleMs) {
+  return ((node.threshold - node.mdp) / (node.phase4Frac * cycleMs)) * 1000
+}
+
+function phase4Comparison(node, cycleMs, baselineNode, baselineCycleMs, latent = false) {
+  const current = phase4SlopeMvPerSecond(node, cycleMs)
+  const baseline = phase4SlopeMvPerSecond(baselineNode, baselineCycleMs)
+  const percent = Math.round((current / baseline - 1) * 100)
+  const label = latent ? 'Latent Phase 4 slope' : 'Phase 4 slope'
+  if (Math.abs(percent) < 3) return `${label}: baseline`
+  return `${label}: ${Math.abs(percent)}% ${percent > 0 ? 'steeper' : 'flatter'} than baseline`
+}
+
 // ── Parametric AP shape generators — sampled fresh whenever physiology
 // changes, reusing interpAP()'s fraction-space lookup convention so these
 // plug straight into TraceCanvas the same way the static 2C arrays do. ──
@@ -652,21 +672,21 @@ function buildSlowResponseWave({ mdp, phase4Frac, threshold }, { n = 60, fireAtF
     data.push([tR, Math.round(v * 10) / 10])
   }
   const phaseDefs = [
-    { id: 'p0', label: 'Upstroke — ICa-L driven', bounds: [0, upEndR],
-      channels: 'ICa-L — NO fast INa', short: tissue === 'av'
-        ? 'Atrial input triggers the AV node — ICa-L carries the slow Phase 0 current'
-        : 'SA fires first — ICa-L opens. No fast INa — explains the slow upstroke',
-      ions: 'Ca²⁺ in via L-type channels → slow, rounded upstroke. Much slower than ventricular upstroke since there is no fast INa here.' },
+    { id: 'p0', label: 'Upstroke — I_Ca,L driven', bounds: [0, upEndR],
+      channels: 'I_Ca,L — NO fast I_Na', short: tissue === 'av'
+        ? 'Atrial input triggers the AV node — I_Ca,L carries the slow Phase 0 current'
+        : 'SA fires first — I_Ca,L opens. No fast I_Na — explains the slow upstroke',
+      ions: 'Ca²⁺ in via L-type channels → slow, rounded upstroke. Much slower than ventricular upstroke since there is no fast I_Na here.' },
     { id: 'repol', label: 'Repolarization', bounds: [upEndR, repolEndR],
-      channels: 'IK (delayed rectifier) + IK-ACh', short: 'Repolarization — IK + IK-ACh',
+      channels: 'I_K (delayed rectifier) + I_K,ACh', short: 'Repolarization — I_K + I_K,ACh',
       ions: 'K⁺ exits via delayed rectifiers and ACh-gated channels, returning toward the pacemaker potential.' },
     { id: 'p4', label: 'Phase 4 — Pacemaker Potential', bounds: [repolEndR, 1],
-      channels: 'If through HCN channels + ICa-T', short: tissue === 'av'
+      channels: 'I_f through HCN channels + I_Ca,T', short: tissue === 'av'
         ? 'Latent pacemaker drift continues, but the next atrial impulse normally arrives first'
-        : 'Phase 4 — If through HCN channels helps build toward the next beat',
+        : 'Phase 4 — I_f through HCN channels helps build toward the next beat',
       ions: tissue === 'av'
         ? 'HCN and T-type calcium channels support latent automaticity. During normal sinus rhythm, atrial excitation triggers the next AV nodal action potential before this drift reaches threshold.'
-        : 'Mixed cations carry If through HCN channels; Ca²⁺ enters through T-type channels as threshold approaches. The Phase 4 slope helps set heart rate.' },
+        : 'Mixed cations carry I_f through HCN channels; Ca²⁺ enters through T-type channels as threshold approaches. The Phase 4 slope helps set heart rate.' },
   ]
   const phases = phaseDefs.flatMap(({ bounds: [lo, hi], ...phase }) =>
     splitPhaseWindow(lo + fireAtFrac, hi + fireAtFrac).map(tRange => ({ ...phase, tRange }))
@@ -723,30 +743,30 @@ function buildWorkingCellWave({ restingMv, upstrokePeak, upstrokeSlowFactor, pla
   const label0 = isPurkinje ? 'Phase 0 — Fastest Upstroke' : 'Phase 0 — Fast Upstroke'
   const phases = [
     { id: 'p4r', label: 'Phase 4 — Resting Potential', tRange: [0, p0Start],
-      channels: isPurkinje ? 'IK1 + slow If' : 'IK1 (inward rectifier)',
-      short: isAtrium ? 'Phase 4 — resting potential (IK1). Fires almost immediately after SA.' : 'Phase 4 — resting potential (IK1)',
-      ions: 'K⁺ outward via IK1 holds a stable resting potential until an external stimulus arrives.' },
+      channels: isPurkinje ? 'I_K1 + slow I_f' : 'I_K1 (inward rectifier)',
+      short: isAtrium ? 'Phase 4 — resting potential (I_K1). Fires almost immediately after SA.' : 'Phase 4 — resting potential (I_K1)',
+      ions: 'K⁺ outward via I_K1 holds a stable resting potential until an external stimulus arrives.' },
     { id: 'p0', label: label0, tRange: [p0Start, p0End],
-      channels: isPurkinje ? 'INa (fast) — highest dV/dt in heart' : 'INa (fast voltage-gated Na⁺)',
-      short: 'Phase 0 — Rapid depolarization (INa opens)',
-      ions: 'Na⁺ rushes in through fast channels → rapid upstroke. IK1 closes as INa snaps open.' },
+      channels: isPurkinje ? 'I_Na (fast) — highest dV/dt in heart' : 'I_Na (fast voltage-gated Na⁺)',
+      short: 'Phase 0 — Rapid depolarization (I_Na opens)',
+      ions: 'Na⁺ rushes in through fast channels → rapid upstroke. I_K1 closes as I_Na snaps open.' },
     { id: 'p1', label: 'Phase 1 — Early Repolarization', tRange: [p0End, p1End],
-      channels: 'Ito (transient outward K⁺)', short: 'Phase 1 — transient notch (Ito)',
-      ions: 'K⁺ briefly exits via Ito, creating the notch between the upstroke and the plateau.' },
+      channels: 'I_to (transient outward K⁺)', short: 'Phase 1 — transient notch (I_to)',
+      ions: 'K⁺ briefly exits via I_to, creating the notch between the upstroke and the plateau.' },
     { id: 'p2', label: isAtrium ? 'Phase 2 — Brief Plateau' : 'Phase 2 — Plateau', tRange: [p1End, p2End],
-      channels: 'ICa-L (in) balanced vs IKr + IKs (out)', short: 'Phase 2 — plateau (ICa-L opens, IKr begins activating)',
+      channels: 'I_Ca,L (in) balanced vs I_Kr + I_Ks (out)', short: 'Phase 2 — plateau (I_Ca,L opens, I_Kr begins activating)',
       ions: isAtrium
-        ? 'Ca²⁺ in via ICa-L balanced by K⁺ out — much briefer than the ventricular plateau, giving atrial cells a shorter refractory period.'
-        : 'Ca²⁺ in via ICa-L is balanced by K⁺ starting to exit via IKr/IKs, holding the plateau near 0 mV.' },
+        ? 'Ca²⁺ in via I_Ca,L balanced by K⁺ out — much briefer than the ventricular plateau, giving atrial cells a shorter refractory period.'
+        : 'Ca²⁺ in via I_Ca,L is balanced by K⁺ starting to exit via I_Kr/I_Ks, holding the plateau near 0 mV.' },
     { id: 'p3', label: 'Phase 3 — Rapid Repolarization', tRange: [p2End, p3End],
-      channels: 'IKr + IKs (rapid + slow delayed rectifiers)', short: 'Phase 3 — ICa-L closes, IKr/IKs drive repolarization',
-      ions: 'ICa-L inactivates; IKr and IKs dominate → rapid return toward resting potential.' },
+      channels: 'I_Kr + I_Ks (rapid + slow delayed rectifiers)', short: 'Phase 3 — I_Ca,L closes, I_Kr/I_Ks drive repolarization',
+      ions: 'I_Ca,L inactivates; I_Kr and I_Ks dominate → rapid return toward resting potential.' },
     { id: 'p4d', label: 'Phase 4 — Electrical Diastole', tRange: [p3End, 1],
-      channels: isPurkinje ? 'IK1 (± slow If)' : 'IK1 (inward rectifier)',
-      short: 'Phase 4 — IK1 maintains resting potential',
+      channels: isPurkinje ? 'I_K1 (± slow I_f)' : 'I_K1 (inward rectifier)',
+      short: 'Phase 4 — I_K1 maintains resting potential',
       ions: isPurkinje
-        ? 'IK1 stabilizes the resting potential; a slow If gives Purkinje fibers slight backup automaticity if SA/AV both fail.'
-        : 'IK1 maintains a stable resting potential — no spontaneous depolarization, unlike the SA node.' },
+        ? 'I_K1 stabilizes the resting potential; a slow I_f gives Purkinje fibers slight backup automaticity if SA/AV both fail.'
+        : 'I_K1 maintains a stable resting potential — no spontaneous depolarization, unlike the SA node.' },
   ]
   return { data, phases }
 }
@@ -820,55 +840,55 @@ const PHASE_NUMBER = {
 // CURRENT phase id each frame. No hover required: IonChannelRow below reads
 // the shared clock directly and updates automatically as the cursor moves. ──
 const SA_ION_CHANNELS = [
-  { id: 'If',   label: 'If',       note: 'If through HCN channels — the pacemaker current', levels: { p4: 1,    p0: 0.15, repol: 0.10 } },
-  { id: 'ICaT', label: 'ICa-T',    note: 'ICa-T through T-type Ca²⁺ channels — activates near threshold', levels: { p4: 0.65, p0: 0.20, repol: 0 } },
-  { id: 'ICaL', label: 'ICa-L',    note: 'ICa-L through L-type Ca²⁺ channels — drives the SA upstroke (NOT INa)', levels: { p4: 0.05, p0: 1,    repol: 0.10 } },
-  { id: 'IK',   label: 'IK/IK-ACh', note: 'K⁺ currents through delayed rectifier and GIRK channels', levels: { p4: 0.10, p0: 0,    repol: 1 } },
+  { id: 'If',   label: 'I_f',       note: 'I_f through HCN channels — the pacemaker current', levels: { p4: 1,    p0: 0.15, repol: 0.10 } },
+  { id: 'ICaT', label: 'I_Ca,T',    note: 'I_Ca,T through T-type Ca²⁺ channels — activates near threshold', levels: { p4: 0.65, p0: 0.20, repol: 0 } },
+  { id: 'ICaL', label: 'I_Ca,L',    note: 'I_Ca,L through L-type Ca²⁺ channels — drives the SA upstroke (NOT I_Na)', levels: { p4: 0.05, p0: 1,    repol: 0.10 } },
+  { id: 'IK',   label: 'I_K/I_K,ACh', note: 'K⁺ currents through delayed rectifier and GIRK channels', levels: { p4: 0.10, p0: 0,    repol: 1 } },
 ]
 const AV_ION_CHANNELS = [
-  { id: 'If',   label: 'If',       note: 'If through HCN channels — supports latent pacemaker activity', levels: { p4: 0.70, p0: 0.10, repol: 0.10 } },
-  { id: 'ICaT', label: 'ICa-T',    note: 'ICa-T through T-type Ca²⁺ channels — contributes as threshold approaches', levels: { p4: 0.55, p0: 0.20, repol: 0 } },
-  { id: 'ICaL', label: 'ICa-L',    note: 'ICa-L through L-type Ca²⁺ channels — carries the slow AV nodal upstroke', levels: { p4: 0.05, p0: 1, repol: 0.10 } },
-  { id: 'IK',   label: 'IK/IK-ACh', note: 'K⁺ currents through delayed rectifier and GIRK channels', levels: { p4: 0.10, p0: 0, repol: 1 } },
+  { id: 'If',   label: 'I_f',       note: 'I_f through HCN channels — supports latent pacemaker activity', levels: { p4: 0.70, p0: 0.10, repol: 0.10 } },
+  { id: 'ICaT', label: 'I_Ca,T',    note: 'I_Ca,T through T-type Ca²⁺ channels — contributes as threshold approaches', levels: { p4: 0.55, p0: 0.20, repol: 0 } },
+  { id: 'ICaL', label: 'I_Ca,L',    note: 'I_Ca,L through L-type Ca²⁺ channels — carries the slow AV nodal upstroke', levels: { p4: 0.05, p0: 1, repol: 0.10 } },
+  { id: 'IK',   label: 'I_K/I_K,ACh', note: 'K⁺ currents through delayed rectifier and GIRK channels', levels: { p4: 0.10, p0: 0, repol: 1 } },
 ]
 const MYO_ION_CHANNELS = [
-  { id: 'INa',  label: 'INa',  note: 'Fast Na⁺ — snaps open at Phase 0', levels: { p4r: 0,    p0: 1,    p1: 0.05, p2: 0,    p3: 0,    p4d: 0 } },
-  { id: 'IK1',  label: 'IK1',  note: 'Inward rectifier — holds resting potential, closes on upstroke', levels: { p4r: 1, p0: 0.05, p1: 0.10, p2: 0.10, p3: 0.20, p4d: 1 } },
-  { id: 'Ito',  label: 'Ito',  note: 'Transient outward — brief Phase 1 notch', levels: { p4r: 0, p0: 0.10, p1: 1,    p2: 0.15, p3: 0,    p4d: 0 } },
-  { id: 'ICaL', label: 'ICa-L', note: 'L-type Ca²⁺ — the plateau current', levels: { p4r: 0,   p0: 0.20, p1: 0.40, p2: 1,    p3: 0.25, p4d: 0 } },
-  { id: 'IKr',  label: 'IKr',  note: 'Rapid delayed rectifier — begins in Phase 2, dominant in Phase 3', levels: { p4r: 0, p0: 0,    p1: 0.10, p2: 0.45, p3: 1,    p4d: 0.10 } },
-  { id: 'IKs',  label: 'IKs',  note: 'Slow delayed rectifier — joins IKr for repolarization', levels: { p4r: 0, p0: 0,    p1: 0.05, p2: 0.35, p3: 0.90, p4d: 0.10 } },
+  { id: 'INa',  label: 'I_Na',  note: 'Fast Na⁺ current — snaps on at Phase 0', levels: { p4r: 0,    p0: 1,    p1: 0.05, p2: 0,    p3: 0,    p4d: 0 } },
+  { id: 'IK1',  label: 'I_K1',  note: 'Inward rectifier current — holds resting potential, decreases on the upstroke', levels: { p4r: 1, p0: 0.05, p1: 0.10, p2: 0.10, p3: 0.20, p4d: 1 } },
+  { id: 'Ito',  label: 'I_to',  note: 'Transient outward current — brief Phase 1 notch', levels: { p4r: 0, p0: 0.10, p1: 1,    p2: 0.15, p3: 0,    p4d: 0 } },
+  { id: 'ICaL', label: 'I_Ca,L', note: 'L-type Ca²⁺ current — supports the plateau', levels: { p4r: 0,   p0: 0.20, p1: 0.40, p2: 1,    p3: 0.25, p4d: 0 } },
+  { id: 'IKr',  label: 'I_Kr',  note: 'Rapid delayed rectifier current — begins in Phase 2, dominant in Phase 3', levels: { p4r: 0, p0: 0,    p1: 0.10, p2: 0.45, p3: 1,    p4d: 0.10 } },
+  { id: 'IKs',  label: 'I_Ks',  note: 'Slow delayed rectifier current — joins I_Kr for repolarization', levels: { p4r: 0, p0: 0,    p1: 0.05, p2: 0.35, p3: 0.90, p4d: 0.10 } },
 ]
 const PK_ION_CHANNELS = [
-  { id: 'INa',  label: 'INa',  note: 'Fastest Na⁺ upstroke in the heart (highest dV/dt)', levels: { p4r: 0,   p0: 1,    p1: 0.05, p2: 0,    p3: 0,    p4d: 0 } },
-  { id: 'IK1',  label: 'IK1',  note: 'Inward rectifier — dominant at rest', levels: { p4r: 1, p0: 0.05, p1: 0.10, p2: 0.10, p3: 0.20, p4d: 0.80 } },
-  { id: 'Ito',  label: 'Ito',  note: 'Transient outward — brief Phase 1 notch', levels: { p4r: 0, p0: 0.10, p1: 1,    p2: 0.15, p3: 0,    p4d: 0 } },
-  { id: 'ICaL', label: 'ICa-L', note: 'L-type Ca²⁺ — the longest plateau of any cardiac cell', levels: { p4r: 0, p0: 0.20, p1: 0.40, p2: 1,  p3: 0.25, p4d: 0 } },
-  { id: 'IKr',  label: 'IKr',  note: 'Rapid delayed rectifier', levels: { p4r: 0, p0: 0, p1: 0.10, p2: 0.45, p3: 1,    p4d: 0.10 } },
-  { id: 'IKs',  label: 'IKs',  note: 'Slow delayed rectifier', levels: { p4r: 0, p0: 0, p1: 0.05, p2: 0.35, p3: 0.90, p4d: 0.10 } },
-  { id: 'If',   label: 'If', note: 'Slow If supports slight automaticity — backup pacemaker if SA/AV both fail', levels: { p4r: 0.05, p0: 0, p1: 0, p2: 0, p3: 0, p4d: 0.35 } },
+  { id: 'INa',  label: 'I_Na',  note: 'Fast Na⁺ current produces the fastest upstroke in the heart (highest dV/dt)', levels: { p4r: 0,   p0: 1,    p1: 0.05, p2: 0,    p3: 0,    p4d: 0 } },
+  { id: 'IK1',  label: 'I_K1',  note: 'Inward rectifier current — dominant at rest', levels: { p4r: 1, p0: 0.05, p1: 0.10, p2: 0.10, p3: 0.20, p4d: 0.80 } },
+  { id: 'Ito',  label: 'I_to',  note: 'Transient outward current — brief Phase 1 notch', levels: { p4r: 0, p0: 0.10, p1: 1,    p2: 0.15, p3: 0,    p4d: 0 } },
+  { id: 'ICaL', label: 'I_Ca,L', note: 'L-type Ca²⁺ current — supports the longest plateau of any cardiac cell', levels: { p4r: 0, p0: 0.20, p1: 0.40, p2: 1,  p3: 0.25, p4d: 0 } },
+  { id: 'IKr',  label: 'I_Kr',  note: 'Rapid delayed rectifier current', levels: { p4r: 0, p0: 0, p1: 0.10, p2: 0.45, p3: 1,    p4d: 0.10 } },
+  { id: 'IKs',  label: 'I_Ks',  note: 'Slow delayed rectifier current', levels: { p4r: 0, p0: 0, p1: 0.05, p2: 0.35, p3: 0.90, p4d: 0.10 } },
+  { id: 'If',   label: 'I_f', note: 'Slow I_f supports slight automaticity — backup pacemaker if SA/AV both fail', levels: { p4r: 0.05, p0: 0, p1: 0, p2: 0, p3: 0, p4d: 0.35 } },
 ]
 const ATRIAL_ION_CHANNELS = [
-  { id: 'INa',  label: 'INa',  note: 'Fast Na⁺ — snaps open at Phase 0', levels: { p4r: 0,    p0: 1,    p1: 0.05, p2: 0,    p3: 0,    p4d: 0 } },
-  { id: 'IK1',  label: 'IK1',  note: 'Inward rectifier — holds resting potential, closes on upstroke', levels: { p4r: 1, p0: 0.05, p1: 0.10, p2: 0.10, p3: 0.20, p4d: 1 } },
-  { id: 'Ito',  label: 'Ito',  note: 'Transient outward — brief Phase 1 notch', levels: { p4r: 0, p0: 0.10, p1: 1,    p2: 0.15, p3: 0,    p4d: 0 } },
-  { id: 'ICaL', label: 'ICa-L', note: 'L-type Ca²⁺ — a much briefer plateau than ventricle', levels: { p4r: 0,  p0: 0.20, p1: 0.40, p2: 1,    p3: 0.25, p4d: 0 } },
-  { id: 'IKr',  label: 'IKr',  note: 'Rapid delayed rectifier — begins in Phase 2, dominant in Phase 3', levels: { p4r: 0, p0: 0,    p1: 0.10, p2: 0.45, p3: 1,    p4d: 0.10 } },
-  { id: 'IKs',  label: 'IKs',  note: 'Slow delayed rectifier — joins IKr for repolarization', levels: { p4r: 0, p0: 0,    p1: 0.05, p2: 0.35, p3: 0.90, p4d: 0.10 } },
+  { id: 'INa',  label: 'I_Na',  note: 'Fast Na⁺ current — snaps on at Phase 0', levels: { p4r: 0,    p0: 1,    p1: 0.05, p2: 0,    p3: 0,    p4d: 0 } },
+  { id: 'IK1',  label: 'I_K1',  note: 'Inward rectifier current — holds resting potential, decreases on the upstroke', levels: { p4r: 1, p0: 0.05, p1: 0.10, p2: 0.10, p3: 0.20, p4d: 1 } },
+  { id: 'Ito',  label: 'I_to',  note: 'Transient outward current — brief Phase 1 notch', levels: { p4r: 0, p0: 0.10, p1: 1,    p2: 0.15, p3: 0,    p4d: 0 } },
+  { id: 'ICaL', label: 'I_Ca,L', note: 'L-type Ca²⁺ current — supports a much briefer plateau than in ventricle', levels: { p4r: 0,  p0: 0.20, p1: 0.40, p2: 1,    p3: 0.25, p4d: 0 } },
+  { id: 'IKr',  label: 'I_Kr',  note: 'Rapid delayed rectifier current — begins in Phase 2, dominant in Phase 3', levels: { p4r: 0, p0: 0,    p1: 0.10, p2: 0.45, p3: 1,    p4d: 0.10 } },
+  { id: 'IKs',  label: 'I_Ks',  note: 'Slow delayed rectifier current — joins I_Kr for repolarization', levels: { p4r: 0, p0: 0,    p1: 0.05, p2: 0.35, p3: 0.90, p4d: 0.10 } },
 ]
 
 // Keep current symbols and channel protein names visually distinct. The
 // molecular examples are intentionally family-level teaching labels.
 const CURRENT_CHANNEL_GLOSSARY = [
-  { id: 'If', name: 'Funny current', channel: 'HCN channels', detail: 'pacemaker depolarization' },
-  { id: 'ICa-T', name: 'T-type calcium current', channel: 'CaV3.x channels', detail: 'approach to nodal threshold' },
-  { id: 'ICa-L', name: 'L-type calcium current', channel: 'CaV1.x channels', detail: 'nodal upstroke and myocardial plateau' },
-  { id: 'IK / IK-ACh', name: 'Delayed rectifier and ACh-sensitive K⁺ currents', channel: 'delayed rectifier channels and GIRK channels', detail: 'nodal repolarization and vagal slowing' },
-  { id: 'INa', name: 'Fast sodium current', channel: 'NaV1.5 channels', detail: 'fast response Phase 0' },
-  { id: 'IK1', name: 'Inward rectifier potassium current', channel: 'Kir2.x channels', detail: 'stable resting potential' },
-  { id: 'Ito', name: 'Transient outward potassium current', channel: 'primarily Kv4.x channels', detail: 'Phase 1 notch' },
-  { id: 'IKr', name: 'Rapid delayed rectifier potassium current', channel: 'hERG or Kv11.1 channels', detail: 'Phase 3 repolarization' },
-  { id: 'IKs', name: 'Slow delayed rectifier potassium current', channel: 'Kv7.1 with KCNE1', detail: 'Phase 3 repolarization' },
+  { id: 'I_f', name: 'Funny current', channel: 'HCN channels', detail: 'pacemaker depolarization' },
+  { id: 'I_Ca,T', name: 'T-type calcium current', channel: 'CaV3.x channels', detail: 'approach to nodal threshold' },
+  { id: 'I_Ca,L', name: 'L-type calcium current', channel: 'CaV1.x channels', detail: 'nodal upstroke and myocardial plateau' },
+  { id: 'I_K / I_K,ACh', name: 'Delayed rectifier and ACh-sensitive K⁺ currents', channel: 'delayed rectifier channels and GIRK channels', detail: 'nodal repolarization and vagal slowing' },
+  { id: 'I_Na', name: 'Fast sodium current', channel: 'NaV1.5 channels', detail: 'fast response Phase 0' },
+  { id: 'I_K1', name: 'Inward rectifier potassium current', channel: 'Kir2.x channels', detail: 'stable resting potential' },
+  { id: 'I_to', name: 'Transient outward potassium current', channel: 'primarily Kv4.x channels', detail: 'Phase 1 notch' },
+  { id: 'I_Kr', name: 'Rapid delayed rectifier potassium current', channel: 'hERG or Kv11.1 channels', detail: 'Phase 3 repolarization' },
+  { id: 'I_Ks', name: 'Slow delayed rectifier potassium current', channel: 'Kv7.1 with KCNE1', detail: 'Phase 3 repolarization' },
 ]
 function IonChannelGlossary() {
   return (
@@ -975,7 +995,21 @@ function PhaseLabel({ clockRef, cycleMs, phases }) {
 
 // One live panel = trace (TraceCanvas) + optional phase-number bands +
 // live phase description + the ion channel row underneath.
-function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, color, showPhaseNumbers, mechanics }) {
+function APLivePanel({
+  clockRef,
+  cycleMs,
+  title,
+  sub,
+  data,
+  phases,
+  channels,
+  color,
+  showPhaseNumbers,
+  mechanics,
+  referenceData,
+  referenceCycleMs,
+  phase4Summary,
+}) {
   const xDomain = useMemo(() => [0, cycleMs], [cycleMs])
   const phaseMarkers = useMemo(
     () => phases.map(ph => {
@@ -991,6 +1025,10 @@ function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, co
     [phases, cycleMs, showPhaseNumbers]
   )
   const valueAt = useCallback((t) => interpAP(data, t / cycleMs), [data, cycleMs])
+  const referenceValueAt = useCallback(
+    (t) => referenceData && referenceCycleMs ? interpAP(referenceData, t / referenceCycleMs) : null,
+    [referenceData, referenceCycleMs]
+  )
   const calciumAt = useCallback(
     (t) => mechanics ? interpAP(mechanics.calcium, t / cycleMs) : 0,
     [mechanics, cycleMs]
@@ -1005,6 +1043,9 @@ function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, co
       <div className="px-3 pt-1.5 pb-0.5">
         <div className="text-sm font-semibold text-gray-100 leading-snug">{title}</div>
         <div className="min-h-9 text-xs font-medium leading-snug text-gray-300">{sub}</div>
+        {phase4Summary && (
+          <div className="text-xs font-semibold leading-snug text-amber-200">{phase4Summary}</div>
+        )}
       </div>
       <div className="flex items-baseline justify-between px-3 pb-0.5">
         <span className="text-xs font-semibold" style={{ color }}>Membrane Potential (mV)</span>
@@ -1018,8 +1059,16 @@ function APLivePanel({ clockRef, cycleMs, title, sub, data, phases, channels, co
         color={color}
         phaseMarkers={phaseMarkers}
         bandLabels={bandLabels}
+        referenceValueAt={referenceData ? referenceValueAt : null}
+        referenceXMax={referenceCycleMs}
         height={112}
       />
+      {referenceData && (
+        <div className="flex items-center gap-2 px-3 pt-1 text-[11px] font-medium text-gray-300">
+          <span className="inline-block w-7 border-t border-dashed border-slate-300" aria-hidden="true" />
+          Baseline at 20% sympathetic and 20% parasympathetic tone
+        </div>
+      )}
       <PhaseLabel clockRef={clockRef} cycleMs={cycleMs} phases={phases} />
       <IonChannelRow clockRef={clockRef} cycleMs={cycleMs} phases={phases} channels={channels} />
       {mechanics ? (
@@ -1154,6 +1203,14 @@ function LiveActionPotentials() {
   const av  = useMemo(() => buildSlowResponseWave(phys.av, { fireAtFrac: avEntryFrac, tissue: 'av' }), [phys.av])
   const pk  = useMemo(() => buildWorkingCellWave(phys.purkinje, 'purkinje', 100, purkinjeFireFrac), [phys.purkinje, purkinjeFireFrac])
   const myo = useMemo(() => buildWorkingCellWave(phys.ventricle, 'ventricle', 100, ventricularFireFrac), [phys.ventricle, ventricularFireFrac])
+  const baselineSa = useMemo(
+    () => buildSlowResponseWave(BASELINE_AP_PHYSIOLOGY.sa, { tissue: 'sa' }),
+    []
+  )
+  const baselineAv = useMemo(
+    () => buildSlowResponseWave(BASELINE_AP_PHYSIOLOGY.av, { fireAtFrac: avEntryFrac, tissue: 'av' }),
+    [avEntryFrac]
+  )
   const atrialMechanics = useMemo(
     () => buildExcitationContractionWave(phys, atr.phases, 'atrium'),
     [phys, atr.phases]
@@ -1179,6 +1236,11 @@ function LiveActionPotentials() {
       title: 'SA Node — Automaticity',
       sub: `Fires first · maximum diastolic potential ${phys.sa.mdp.toFixed(1)} mV · ${Math.round(phys.saRate)} bpm`,
       data: sa.data, phases: sa.phases, channels: SA_ION_CHANNELS, color: '#34d399', showPhaseNumbers: true,
+      referenceData: lessonView === 'experiment' ? baselineSa.data : null,
+      referenceCycleMs: BASELINE_AP_PHYSIOLOGY.cycleMs,
+      phase4Summary: lessonView === 'experiment'
+        ? phase4Comparison(phys.sa, phys.cycleMs, BASELINE_AP_PHYSIOLOGY.sa, BASELINE_AP_PHYSIOLOGY.cycleMs)
+        : null,
     },
     atrium: {
       title: 'Atrial Myocyte',
@@ -1189,6 +1251,11 @@ function LiveActionPotentials() {
       title: 'AV Node — Slow Conduction',
       sub: `Activated by atrial input · slow response AP · AV delay ${phys.avDelayMs} ms`,
       data: av.data, phases: av.phases, channels: AV_ION_CHANNELS, color: '#f472b6', showPhaseNumbers: true,
+      referenceData: lessonView === 'experiment' ? baselineAv.data : null,
+      referenceCycleMs: BASELINE_AP_PHYSIOLOGY.cycleMs,
+      phase4Summary: lessonView === 'experiment'
+        ? phase4Comparison(phys.av, phys.cycleMs, BASELINE_AP_PHYSIOLOGY.av, BASELINE_AP_PHYSIOLOGY.cycleMs, true)
+        : null,
     },
     purkinje: {
       title: 'Purkinje Fiber',
@@ -1361,12 +1428,12 @@ function LiveActionPotentials() {
         </div>
         <div className="grid grid-cols-1 gap-2 mt-2">
           <Callout>
-            <strong>Sympathetic (β1 adrenergic):</strong> Noradrenaline / adrenaline → β1 receptor → ↑ If, ↑ ICa-L.
+            <strong>Sympathetic (β1 adrenergic):</strong> Noradrenaline / adrenaline → β1 receptor → ↑ I_f, ↑ I_Ca,L.
             SA node Phase 4 slope steepens (faster automaticity) and cycle shortens; max diastolic potential becomes
             slightly less negative. In working myocardium, trigger Ca²⁺, twitch force, and relaxation rate increase.
           </Callout>
           <Callout>
-            <strong>Parasympathetic (M2 cholinergic):</strong> ACh → M2 receptor → IKAch opens → hyperpolarization.
+            <strong>Parasympathetic (M2 cholinergic):</strong> ACh → M2 receptor → ↑ I_K,ACh → hyperpolarization.
             SA node Phase 4 slope flattens, max diastolic potential hyperpolarizes, and the cycle lengthens
             dramatically at high tone. Parasympathetic has minimal direct effect on ventricular myocytes — they
             have few M2 receptors.
@@ -1417,7 +1484,7 @@ function LiveActionPotentials() {
             <Callout>
               ↓ [K⁺]out shifts EK more negative, making SA node maximum diastolic potential and working-cell resting
               Vm more negative. Repolarization can still slow as conductance through repolarizing K⁺ channels,
-              especially IKr, falls. A small U wave analog appears after ventricular Phase 3.
+              especially I_Kr, falls. A small U wave analog appears after ventricular Phase 3.
             </Callout>
           ) : (
             <Callout>Extracellular [K⁺] is within the normal 3.5–5.0 mEq/L range — resting potential and repolarization are unaffected.</Callout>
@@ -1425,12 +1492,12 @@ function LiveActionPotentials() {
           {caMgDl < 8.5 ? (
             <Callout>
               ↓ [Ca²⁺]out reduces trigger Ca²⁺ and twitch force. Weaker Ca²⁺ dependent inactivation lets the
-              remaining ICa-L persist longer, prolonging Phase 2 and AP duration.
+              remaining I_Ca,L persists longer, prolonging Phase 2 and AP duration.
             </Callout>
           ) : caMgDl > 10.5 ? (
             <Callout>
               ↑ [Ca²⁺]out increases trigger Ca²⁺ and twitch force. Stronger Ca²⁺ dependent inactivation helps
-              terminate ICa-L sooner, shortening Phase 2 and AP duration.
+              terminate I_Ca,L sooner, shortening Phase 2 and AP duration.
             </Callout>
           ) : (
             <Callout>Extracellular [Ca²⁺] is within the normal 8.5–10.5 mg/dL range — the plateau duration is unaffected.</Callout>
@@ -1503,9 +1570,34 @@ function useLocalClock(cycleMs, nativeCycleMs = null, speed = 1) {
 
 // Generic time-series canvas: draws valueAt(t) over xDomain, with an optional
 // set of shaded phase bands and a cursor synced to clockRef's live position.
-function TraceCanvas({ clockRef, valueAt, xDomain, yDomain, color, phaseMarkers, bandLabels, height = 130 }) {
+function TraceCanvas({
+  clockRef,
+  valueAt,
+  xDomain,
+  yDomain,
+  color,
+  phaseMarkers,
+  bandLabels,
+  referenceValueAt = null,
+  referenceXMax = null,
+  height = 130,
+}) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
+  const drawConfigRef = useRef(null)
+
+  useEffect(() => {
+    drawConfigRef.current = {
+      valueAt,
+      xDomain,
+      yDomain,
+      color,
+      phaseMarkers,
+      bandLabels,
+      referenceValueAt,
+      referenceXMax,
+    }
+  }, [valueAt, xDomain, yDomain, color, phaseMarkers, bandLabels, referenceValueAt, referenceXMax])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -1527,11 +1619,21 @@ function TraceCanvas({ clockRef, valueAt, xDomain, yDomain, color, phaseMarkers,
 
     let rafId
     const frame = () => {
+      const {
+        valueAt: liveValueAt,
+        xDomain: liveXDomain,
+        yDomain: liveYDomain,
+        color: liveColor,
+        phaseMarkers: livePhaseMarkers,
+        bandLabels: liveBandLabels,
+        referenceValueAt: liveReferenceValueAt,
+        referenceXMax: liveReferenceXMax,
+      } = drawConfigRef.current
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       const dW = W - PAD.l - PAD.r
       const dH = height - PAD.t - PAD.b
-      const [x0, x1] = xDomain
-      const [yMin, yMax] = yDomain
+      const [x0, x1] = liveXDomain
+      const [yMin, yMax] = liveYDomain
       const toX = (t) => PAD.l + ((t - x0) / (x1 - x0)) * dW
       const toY = (v) => PAD.t + ((yMax - v) / (yMax - yMin)) * dH
 
@@ -1539,8 +1641,8 @@ function TraceCanvas({ clockRef, valueAt, xDomain, yDomain, color, phaseMarkers,
       ctx.fillStyle = '#111827'
       ctx.fillRect(0, 0, W, height)
 
-      if (phaseMarkers) {
-        phaseMarkers.forEach(({ x0: px0, x1: px1, color: pc }) => {
+      if (livePhaseMarkers) {
+        livePhaseMarkers.forEach(({ x0: px0, x1: px1, color: pc }) => {
           if (px1 < x0 || px0 > x1) return
           const rx = toX(Math.max(px0, x0)), rx2 = toX(Math.min(px1, x1))
           ctx.fillStyle = pc
@@ -1550,11 +1652,11 @@ function TraceCanvas({ clockRef, valueAt, xDomain, yDomain, color, phaseMarkers,
 
       // Small numeral drawn at the top of each phase band — e.g. the
       // ventricular panel's 0/1/2/3/4 phase numbers called out in the spec.
-      if (bandLabels) {
+      if (liveBandLabels) {
         ctx.font = 'bold 10px monospace'
         ctx.textAlign = 'center'
         ctx.fillStyle = 'rgba(226,232,240,0.65)'
-        bandLabels.forEach(({ x, text }) => {
+        liveBandLabels.forEach(({ x, text }) => {
           if (x < x0 || x > x1) return
           ctx.fillText(text, toX(x), PAD.t + 11)
         })
@@ -1564,21 +1666,39 @@ function TraceCanvas({ clockRef, valueAt, xDomain, yDomain, color, phaseMarkers,
       ctx.lineWidth = 0.5
       ctx.fillStyle = '#6b7280'
       ctx.font = '9px monospace'
+      ctx.textAlign = 'left'
       const ySteps = 4
       for (let i = 0; i <= ySteps; i++) {
         const v = yMin + (i / ySteps) * (yMax - yMin)
         const y = toY(v)
         ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(W - PAD.r, y); ctx.stroke()
-        ctx.fillText(v.toFixed(Number.isInteger(v) ? 0 : 1), 2, y + 3)
+        ctx.fillText(v.toFixed(Number.isInteger(v) ? 0 : 1), 4, y + 3)
       }
 
-      ctx.strokeStyle = color
+      if (liveReferenceValueAt) {
+        ctx.strokeStyle = '#cbd5e1'
+        ctx.lineWidth = 1.2
+        ctx.setLineDash([5, 4])
+        ctx.beginPath()
+        const referenceEnd = Math.min(x1, liveReferenceXMax ?? x1)
+        const referenceN = Math.max(2, Math.round(220 * (referenceEnd - x0) / (x1 - x0)))
+        for (let i = 0; i <= referenceN; i++) {
+          const t = x0 + (i / referenceN) * (referenceEnd - x0)
+          const v = Math.max(yMin, Math.min(yMax, liveReferenceValueAt(t)))
+          const x = toX(t), y = toY(v)
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+        }
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
+
+      ctx.strokeStyle = liveColor
       ctx.lineWidth = 1.8
       ctx.beginPath()
       const N = 220
       for (let i = 0; i <= N; i++) {
         const t = x0 + (i / N) * (x1 - x0)
-        const v = Math.max(yMin, Math.min(yMax, valueAt(t)))
+        const v = Math.max(yMin, Math.min(yMax, liveValueAt(t)))
         const x = toX(t), y = toY(v)
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
       }
@@ -1601,7 +1721,7 @@ function TraceCanvas({ clockRef, valueAt, xDomain, yDomain, color, phaseMarkers,
     const ro = new ResizeObserver(resize)
     ro.observe(container)
     return () => { cancelAnimationFrame(rafId); ro.disconnect() }
-  }, [valueAt, xDomain, yDomain, phaseMarkers, bandLabels, color, height, clockRef])
+  }, [height, clockRef])
 
   return (
     <div ref={containerRef} className="w-full">
@@ -2690,8 +2810,8 @@ export default function CardiacBridge() {
         >
           <LiveActionPotentials />
           <Callout>
-            SA node and AV node use <strong>slow-response</strong> action potentials (ICa-L upstroke, ~0.05 m/s).
-            Atrial and ventricular myocytes use <strong>fast-response</strong> (INa upstroke, 1 m/s).
+            SA node and AV node use <strong>slow response</strong> action potentials (I_Ca,L upstroke, ~0.05 m/s).
+            Atrial and ventricular myocytes use <strong>fast response</strong> action potentials (I_Na upstroke, 1 m/s).
             Purkinje fibers have the fastest upstroke (highest dV/dt), longest plateau, and act as tertiary
             pacemakers (20–40 bpm) if SA and AV nodes both fail.
           </Callout>
