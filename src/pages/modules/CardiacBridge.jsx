@@ -999,6 +999,7 @@ function APLivePanel({
   color,
   showPhaseNumbers,
   mechanics,
+  referenceMechanics,
   referenceData,
   referenceCycleMs,
   referenceOffsetMs = 0,
@@ -1030,6 +1031,18 @@ function APLivePanel({
   const forceAt = useCallback(
     (t) => mechanics ? interpAP(mechanics.force, t / cycleMs) : 0,
     [mechanics, cycleMs]
+  )
+  const referenceCalciumAt = useCallback(
+    (t) => referenceMechanics && referenceCycleMs
+      ? interpAP(referenceMechanics.calcium, (t - referenceOffsetMs) / referenceCycleMs)
+      : null,
+    [referenceMechanics, referenceCycleMs, referenceOffsetMs]
+  )
+  const referenceForceAt = useCallback(
+    (t) => referenceMechanics && referenceCycleMs
+      ? interpAP(referenceMechanics.force, (t - referenceOffsetMs) / referenceCycleMs)
+      : null,
+    [referenceMechanics, referenceCycleMs, referenceOffsetMs]
   )
 
   return (
@@ -1075,6 +1088,9 @@ function APLivePanel({
             xDomain={xDomain}
             yDomain={CALCIUM_Y_DOMAIN}
             color="#22d3ee"
+            referenceValueAt={referenceMechanics ? referenceCalciumAt : null}
+            referenceXMin={referenceOffsetMs}
+            referenceXMax={referenceOffsetMs + referenceCycleMs}
             height={74}
           />
           <div className="flex items-baseline justify-between px-3 pt-1.5 pb-0.5">
@@ -1087,6 +1103,9 @@ function APLivePanel({
             xDomain={xDomain}
             yDomain={FORCE_Y_DOMAIN}
             color="#fb7185"
+            referenceValueAt={referenceMechanics ? referenceForceAt : null}
+            referenceXMin={referenceOffsetMs}
+            referenceXMax={referenceOffsetMs + referenceCycleMs}
             height={74}
           />
           <p className="px-3 py-2 text-xs text-gray-300 leading-relaxed">
@@ -1238,6 +1257,14 @@ function LiveActionPotentials() {
     () => buildExcitationContractionWave(phys, myo.phases, 'ventricle'),
     [phys, myo.phases]
   )
+  const baselineAtrialMechanics = useMemo(
+    () => buildExcitationContractionWave(BASELINE_AP_PHYSIOLOGY, baselineAtr.phases, 'atrium'),
+    [baselineAtr.phases]
+  )
+  const baselineVentricularMechanics = useMemo(
+    () => buildExcitationContractionWave(BASELINE_AP_PHYSIOLOGY, baselineMyo.phases, 'ventricle'),
+    [baselineMyo.phases]
+  )
 
   const { clockRef, tMs, isPlaying, toggle, scrub } = useLocalClock(phys.cycleMs, null, speed)
 
@@ -1263,10 +1290,11 @@ function LiveActionPotentials() {
       title: 'Atrial Myocyte',
       sub: 'Depolarizes shortly after the SA node · brief plateau',
       data: atr.data, phases: atr.phases, channels: ATRIAL_ION_CHANNELS, color: '#fbbf24', showPhaseNumbers: true, mechanics: atrialMechanics,
+      referenceMechanics: lessonView === 'experiment' ? baselineAtrialMechanics : null,
       referenceData: lessonView === 'experiment' ? baselineAtr.data : null,
       referenceCycleMs: BASELINE_AP_PHYSIOLOGY.cycleMs,
       referenceOffsetMs: phase0AlignmentOffsetMs(atr, phys.cycleMs, baselineAtr, BASELINE_AP_PHYSIOLOGY.cycleMs),
-      referenceLabel: 'Baseline (Reset physiology) · aligned at Phase 0 to compare AP shape',
+      referenceLabel: 'Baseline (Reset physiology) · AP, Ca²⁺, and force aligned at Phase 0',
     },
     av: {
       title: 'AV Node — Slow Conduction',
@@ -1289,10 +1317,11 @@ function LiveActionPotentials() {
       title: 'Ventricular Myocyte',
       sub: 'Activated by the Purkinje network · working myocardium',
       data: myo.data, phases: myo.phases, channels: MYO_ION_CHANNELS, color: '#60a5fa', showPhaseNumbers: true, mechanics: ventricularMechanics,
+      referenceMechanics: lessonView === 'experiment' ? baselineVentricularMechanics : null,
       referenceData: lessonView === 'experiment' ? baselineMyo.data : null,
       referenceCycleMs: BASELINE_AP_PHYSIOLOGY.cycleMs,
       referenceOffsetMs: phase0AlignmentOffsetMs(myo, phys.cycleMs, baselineMyo, BASELINE_AP_PHYSIOLOGY.cycleMs),
-      referenceLabel: 'Baseline (Reset physiology) · aligned at Phase 0 to compare AP shape',
+      referenceLabel: 'Baseline (Reset physiology) · AP, Ca²⁺, and force aligned at Phase 0',
     },
   }
   const visiblePanels = TRACE_OPTIONS.filter(option => selectedTissues.includes(option.id))
