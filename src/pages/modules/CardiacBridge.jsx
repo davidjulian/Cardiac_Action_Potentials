@@ -1771,9 +1771,8 @@ function TraceCanvas({
         const cx = toX(tNow)
         ctx.strokeStyle = '#f8fafc'
         ctx.lineWidth = 1
-        ctx.setLineDash([3, 3])
-        ctx.beginPath(); ctx.moveTo(cx, PAD.t); ctx.lineTo(cx, height - PAD.b); ctx.stroke()
         ctx.setLineDash([])
+        ctx.beginPath(); ctx.moveTo(cx, PAD.t); ctx.lineTo(cx, height - PAD.b); ctx.stroke()
       }
 
       rafId = requestAnimationFrame(frame)
