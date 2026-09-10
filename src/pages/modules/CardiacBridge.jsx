@@ -618,19 +618,6 @@ const BASELINE_AP_PHYSIOLOGY = computeAPPhysiology({
   caMgDl: 9.5,
 })
 
-function phase4SlopeMvPerSecond(node, cycleMs) {
-  return ((node.threshold - node.mdp) / (node.phase4Frac * cycleMs)) * 1000
-}
-
-function phase4Comparison(node, cycleMs, baselineNode, baselineCycleMs, latent = false) {
-  const current = phase4SlopeMvPerSecond(node, cycleMs)
-  const baseline = phase4SlopeMvPerSecond(baselineNode, baselineCycleMs)
-  const percent = Math.round((current / baseline - 1) * 100)
-  const label = latent ? 'Latent Phase 4 slope' : 'Phase 4 slope'
-  if (Math.abs(percent) < 3) return `${label}: baseline`
-  return `${label}: ${Math.abs(percent)}% ${percent > 0 ? 'steeper' : 'flatter'} than baseline`
-}
-
 // ── Parametric AP shape generators — sampled fresh whenever physiology
 // changes, reusing interpAP()'s fraction-space lookup convention so these
 // plug straight into TraceCanvas the same way the static 2C arrays do. ──
@@ -769,6 +756,12 @@ function buildWorkingCellWave({ restingMv, upstrokePeak, upstrokeSlowFactor, pla
         : 'I_K1 maintains a stable resting potential — no spontaneous depolarization, unlike the SA node.' },
   ]
   return { data, phases }
+}
+
+function phase0AlignmentOffsetMs(currentWave, currentCycleMs, baselineWave, baselineCycleMs) {
+  const currentPhase0 = currentWave.phases.find(phase => phase.id === 'p0')?.tRange[0] ?? 0
+  const baselinePhase0 = baselineWave.phases.find(phase => phase.id === 'p0')?.tRange[0] ?? 0
+  return currentPhase0 * currentCycleMs - baselinePhase0 * baselineCycleMs
 }
 
 // A compact excitation contraction model for teaching. It is deliberately
@@ -1008,7 +1001,8 @@ function APLivePanel({
   mechanics,
   referenceData,
   referenceCycleMs,
-  phase4Summary,
+  referenceOffsetMs = 0,
+  referenceLabel,
 }) {
   const xDomain = useMemo(() => [0, cycleMs], [cycleMs])
   const phaseMarkers = useMemo(
@@ -1026,8 +1020,8 @@ function APLivePanel({
   )
   const valueAt = useCallback((t) => interpAP(data, t / cycleMs), [data, cycleMs])
   const referenceValueAt = useCallback(
-    (t) => referenceData && referenceCycleMs ? interpAP(referenceData, t / referenceCycleMs) : null,
-    [referenceData, referenceCycleMs]
+    (t) => referenceData && referenceCycleMs ? interpAP(referenceData, (t - referenceOffsetMs) / referenceCycleMs) : null,
+    [referenceData, referenceCycleMs, referenceOffsetMs]
   )
   const calciumAt = useCallback(
     (t) => mechanics ? interpAP(mechanics.calcium, t / cycleMs) : 0,
@@ -1043,9 +1037,6 @@ function APLivePanel({
       <div className="px-3 pt-1.5 pb-0.5">
         <div className="text-sm font-semibold text-gray-100 leading-snug">{title}</div>
         <div className="min-h-9 text-xs font-medium leading-snug text-gray-300">{sub}</div>
-        {phase4Summary && (
-          <div className="text-xs font-semibold leading-snug text-amber-200">{phase4Summary}</div>
-        )}
       </div>
       <div className="flex items-baseline justify-between px-3 pb-0.5">
         <span className="text-xs font-semibold" style={{ color }}>Membrane Potential (mV)</span>
@@ -1060,13 +1051,14 @@ function APLivePanel({
         phaseMarkers={phaseMarkers}
         bandLabels={bandLabels}
         referenceValueAt={referenceData ? referenceValueAt : null}
-        referenceXMax={referenceCycleMs}
+        referenceXMin={referenceOffsetMs}
+        referenceXMax={referenceOffsetMs + referenceCycleMs}
         height={112}
       />
       {referenceData && (
         <div className="flex items-center gap-2 px-3 pt-1 text-[11px] font-medium text-gray-300">
           <span className="inline-block w-7 border-t border-dashed border-slate-300" aria-hidden="true" />
-          Baseline at 20% sympathetic and 20% parasympathetic tone
+          {referenceLabel}
         </div>
       )}
       <PhaseLabel clockRef={clockRef} cycleMs={cycleMs} phases={phases} />
@@ -1211,6 +1203,33 @@ function LiveActionPotentials() {
     () => buildSlowResponseWave(BASELINE_AP_PHYSIOLOGY.av, { fireAtFrac: avEntryFrac, tissue: 'av' }),
     [avEntryFrac]
   )
+  const baselineHisActivationFrac = clamp(
+    atrialFireFrac + BASELINE_AP_PHYSIOLOGY.avDelayMs / BASELINE_AP_PHYSIOLOGY.cycleMs,
+    0.13,
+    0.38
+  )
+  const baselinePurkinjeFireFrac = clamp(
+    baselineHisActivationFrac + 20 / BASELINE_AP_PHYSIOLOGY.cycleMs,
+    0.15,
+    0.42
+  )
+  const baselineVentricularFireFrac = clamp(
+    baselinePurkinjeFireFrac + 20 / BASELINE_AP_PHYSIOLOGY.cycleMs,
+    0.17,
+    0.45
+  )
+  const baselineAtr = useMemo(
+    () => buildWorkingCellWave(BASELINE_AP_PHYSIOLOGY.atrium, 'atrium', 100, atrialFireFrac),
+    [atrialFireFrac]
+  )
+  const baselinePk = useMemo(
+    () => buildWorkingCellWave(BASELINE_AP_PHYSIOLOGY.purkinje, 'purkinje', 100, baselinePurkinjeFireFrac),
+    [baselinePurkinjeFireFrac]
+  )
+  const baselineMyo = useMemo(
+    () => buildWorkingCellWave(BASELINE_AP_PHYSIOLOGY.ventricle, 'ventricle', 100, baselineVentricularFireFrac),
+    [baselineVentricularFireFrac]
+  )
   const atrialMechanics = useMemo(
     () => buildExcitationContractionWave(phys, atr.phases, 'atrium'),
     [phys, atr.phases]
@@ -1238,14 +1257,16 @@ function LiveActionPotentials() {
       data: sa.data, phases: sa.phases, channels: SA_ION_CHANNELS, color: '#34d399', showPhaseNumbers: true,
       referenceData: lessonView === 'experiment' ? baselineSa.data : null,
       referenceCycleMs: BASELINE_AP_PHYSIOLOGY.cycleMs,
-      phase4Summary: lessonView === 'experiment'
-        ? phase4Comparison(phys.sa, phys.cycleMs, BASELINE_AP_PHYSIOLOGY.sa, BASELINE_AP_PHYSIOLOGY.cycleMs)
-        : null,
+      referenceLabel: 'Baseline (Reset physiology) · cardiac cycle timing retained',
     },
     atrium: {
       title: 'Atrial Myocyte',
       sub: 'Depolarizes shortly after the SA node · brief plateau',
       data: atr.data, phases: atr.phases, channels: ATRIAL_ION_CHANNELS, color: '#fbbf24', showPhaseNumbers: true, mechanics: atrialMechanics,
+      referenceData: lessonView === 'experiment' ? baselineAtr.data : null,
+      referenceCycleMs: BASELINE_AP_PHYSIOLOGY.cycleMs,
+      referenceOffsetMs: phase0AlignmentOffsetMs(atr, phys.cycleMs, baselineAtr, BASELINE_AP_PHYSIOLOGY.cycleMs),
+      referenceLabel: 'Baseline (Reset physiology) · aligned at Phase 0 to compare AP shape',
     },
     av: {
       title: 'AV Node — Slow Conduction',
@@ -1253,19 +1274,25 @@ function LiveActionPotentials() {
       data: av.data, phases: av.phases, channels: AV_ION_CHANNELS, color: '#f472b6', showPhaseNumbers: true,
       referenceData: lessonView === 'experiment' ? baselineAv.data : null,
       referenceCycleMs: BASELINE_AP_PHYSIOLOGY.cycleMs,
-      phase4Summary: lessonView === 'experiment'
-        ? phase4Comparison(phys.av, phys.cycleMs, BASELINE_AP_PHYSIOLOGY.av, BASELINE_AP_PHYSIOLOGY.cycleMs, true)
-        : null,
+      referenceLabel: 'Baseline (Reset physiology) · cardiac cycle timing retained',
     },
     purkinje: {
       title: 'Purkinje Fiber',
       sub: 'Activated after the AV node, His bundle, and bundle branches · before ventricular myocytes',
       data: pk.data, phases: pk.phases, channels: PK_ION_CHANNELS, color: '#a78bfa', showPhaseNumbers: true,
+      referenceData: lessonView === 'experiment' ? baselinePk.data : null,
+      referenceCycleMs: BASELINE_AP_PHYSIOLOGY.cycleMs,
+      referenceOffsetMs: phase0AlignmentOffsetMs(pk, phys.cycleMs, baselinePk, BASELINE_AP_PHYSIOLOGY.cycleMs),
+      referenceLabel: 'Baseline (Reset physiology) · aligned at Phase 0 to compare AP shape',
     },
     ventricle: {
       title: 'Ventricular Myocyte',
       sub: 'Activated by the Purkinje network · working myocardium',
       data: myo.data, phases: myo.phases, channels: MYO_ION_CHANNELS, color: '#60a5fa', showPhaseNumbers: true, mechanics: ventricularMechanics,
+      referenceData: lessonView === 'experiment' ? baselineMyo.data : null,
+      referenceCycleMs: BASELINE_AP_PHYSIOLOGY.cycleMs,
+      referenceOffsetMs: phase0AlignmentOffsetMs(myo, phys.cycleMs, baselineMyo, BASELINE_AP_PHYSIOLOGY.cycleMs),
+      referenceLabel: 'Baseline (Reset physiology) · aligned at Phase 0 to compare AP shape',
     },
   }
   const visiblePanels = TRACE_OPTIONS.filter(option => selectedTissues.includes(option.id))
@@ -1491,8 +1518,8 @@ function LiveActionPotentials() {
           )}
           {caMgDl < 8.5 ? (
             <Callout>
-              ↓ [Ca²⁺]out reduces trigger Ca²⁺ and twitch force. Weaker Ca²⁺ dependent inactivation lets the
-              remaining I_Ca,L persists longer, prolonging Phase 2 and AP duration.
+              ↓ [Ca²⁺]out reduces trigger Ca²⁺ and twitch force. Weaker Ca²⁺ dependent inactivation allows the
+              remaining I_Ca,L to persist longer, prolonging Phase 2 and AP duration.
             </Callout>
           ) : caMgDl > 10.5 ? (
             <Callout>
@@ -1579,6 +1606,7 @@ function TraceCanvas({
   phaseMarkers,
   bandLabels,
   referenceValueAt = null,
+  referenceXMin = null,
   referenceXMax = null,
   height = 130,
 }) {
@@ -1595,9 +1623,10 @@ function TraceCanvas({
       phaseMarkers,
       bandLabels,
       referenceValueAt,
+      referenceXMin,
       referenceXMax,
     }
-  }, [valueAt, xDomain, yDomain, color, phaseMarkers, bandLabels, referenceValueAt, referenceXMax])
+  }, [valueAt, xDomain, yDomain, color, phaseMarkers, bandLabels, referenceValueAt, referenceXMin, referenceXMax])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -1627,6 +1656,7 @@ function TraceCanvas({
         phaseMarkers: livePhaseMarkers,
         bandLabels: liveBandLabels,
         referenceValueAt: liveReferenceValueAt,
+        referenceXMin: liveReferenceXMin,
         referenceXMax: liveReferenceXMax,
       } = drawConfigRef.current
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -1680,15 +1710,18 @@ function TraceCanvas({
         ctx.lineWidth = 1.2
         ctx.setLineDash([5, 4])
         ctx.beginPath()
+        const referenceStart = Math.max(x0, liveReferenceXMin ?? x0)
         const referenceEnd = Math.min(x1, liveReferenceXMax ?? x1)
-        const referenceN = Math.max(2, Math.round(220 * (referenceEnd - x0) / (x1 - x0)))
-        for (let i = 0; i <= referenceN; i++) {
-          const t = x0 + (i / referenceN) * (referenceEnd - x0)
-          const v = Math.max(yMin, Math.min(yMax, liveReferenceValueAt(t)))
-          const x = toX(t), y = toY(v)
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+        if (referenceEnd > referenceStart) {
+          const referenceN = Math.max(2, Math.round(220 * (referenceEnd - referenceStart) / (x1 - x0)))
+          for (let i = 0; i <= referenceN; i++) {
+            const t = referenceStart + (i / referenceN) * (referenceEnd - referenceStart)
+            const v = Math.max(yMin, Math.min(yMax, liveReferenceValueAt(t)))
+            const x = toX(t), y = toY(v)
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+          }
+          ctx.stroke()
         }
-        ctx.stroke()
         ctx.setLineDash([])
       }
 
