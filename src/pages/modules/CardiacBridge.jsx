@@ -243,7 +243,7 @@ const QRS_ONSET_MS = DEFAULT_RHYTHM_PARAMS.prInterval
 // the chambers start filling (see buildConductionMap's normalSinusVoltage
 // case: ventDelay = hisBottomMs - qOnMs + 20, a constant 40ms for this
 // preset's fixed His-entry duration). That's a fine cosmetic choice for the
-// animation on its own — and 2D's Conduction Animation still uses it
+// animation on its own — and 1C's Conduction Animation still uses it
 // unmodified — but here the AP graph and ECG trace are shifted to match it
 // instead, so what the animation visually shows and what these graphs show
 // agree on the same instant, rather than the graphs "leading" the animation.
@@ -362,7 +362,7 @@ function InfoRow({ label, value }) {
   )
 }
 
-// ── 2A: Heart Anatomy Overview ─────────────────────────────────────────────
+// ── 1A: Heart Anatomy Overview ─────────────────────────────────────────────
 function AnatomyDiagram({ selected, onSelect }) {
   const [hovered, setHovered] = useState(null)
   const active = hovered || selected
@@ -524,7 +524,7 @@ function AnatomyDiagram({ selected, onSelect }) {
   )
 }
 
-// ── 2B: Action Potentials by Cell Type ────────────────────────────────────
+// ── 1B: Action Potentials by Cell Type ────────────────────────────────────
 const AP_VMIN = -100, AP_VMAX = 45
 
 // Stable array references for TraceCanvas's yDomain prop — ECGVsAPSection
@@ -1621,7 +1621,7 @@ function ElectrodeIcon() {
 }
 
 // Draggable micropipette dropped directly onto the SAME heart illustration
-// used by 2D's Conduction Animation (HeartAnimation), driven by the exact
+// used by 1C's Conduction Animation (HeartAnimation), driven by the exact
 // clock powering the AP/ECG graphs below — so the conduction sweep animates
 // in sync with both traces rather than running on its own separate timer.
 //
@@ -2095,8 +2095,8 @@ function ECGVsAPSection({ rhythm }) {
   )
 }
 
-// ── 2D: Conduction Animation ────────────────────────────────────────────────
-// Owns its own clock now that 2D is a standalone tab, never mounted
+// ── 1C: Conduction Animation ────────────────────────────────────────────────
+// Owns its own clock now that 1C is a standalone tab, never mounted
 // alongside 2E — they used to share one master clock via props from the
 // top-level CardiacBridge component; now each tab gets its own via the
 // same useLocalClock hook 2C already uses.
@@ -2313,8 +2313,8 @@ function CardiacVectorOverlay({ clockRef, waves, cycleMs, width = 280, height = 
 
 // ── 2E: Cardiac Vector Cycle ───────────────────────────────────────────────
 // Owns its own clock + controls now that 2E is a standalone tab — it used
-// to be silently driven by 2D's master clock (no controls of its own at
-// all). Same useLocalClock hook 2C/2D use; this component was never
+// to be silently driven by 1C's master clock (no controls of its own at
+// all). Same useLocalClock hook 1C uses; this component was never
 // internally rAF-driven anyway (it repaints via p5's redraw() whenever
 // dataRef's effect fires), so swapping the time source in is a clean drop-in.
 function VectorCycle({ rhythm }) {
@@ -2637,10 +2637,10 @@ function VectorCycle({ rhythm }) {
   )
 }
 
-const MODULE2_TABS = [
-  { id: '2A', label: '2A · Cardiac Anatomy', shortLabel: 'Cardiac anatomy' },
-  { id: '2B', label: '2B · Action Potentials', shortLabel: 'Action potentials' },
-  { id: '2D', label: '2D · Conduction', shortLabel: 'Conduction' },
+const MODULE1_TABS = [
+  { id: '1A', label: '1A · Cardiac Anatomy', shortLabel: 'Cardiac anatomy' },
+  { id: '1B', label: '1B · Action Potentials', shortLabel: 'Action potentials' },
+  { id: '1C', label: '1C · Conduction', shortLabel: 'Conduction' },
 ]
 
 // ── Main export ────────────────────────────────────────────────────────────
@@ -2653,27 +2653,27 @@ export default function CardiacBridge() {
     }
   }, [])
 
-  const [selected2A, setSelected2A] = useState(null)
+  const [selected1A, setSelected1A] = useState(null)
 
-  const { active, visited, setActive } = useTabState('cardiac', MODULE2_TABS.map(t => t.id))
+  const { active, visited, setActive } = useTabState('cardiac', MODULE1_TABS.map(t => t.id))
   // Tabs now render as a sub-menu in the sidebar (see Sidebar.jsx) instead
   // of an in-page pill bar — this just publishes the same state there.
-  usePublishTabs('cardiac', MODULE2_TABS, { active, visited, setActive })
+  usePublishTabs('cardiac', MODULE1_TABS, { active, visited, setActive })
 
   return (
     <ModulePage
       moduleId="cardiac"
-      number={2}
+      number={1}
       title="Cardiac Action Potentials"
-      wide={active === '2B'}
+      wide={active === '1B'}
     >
-      {active === '2A' && (
+      {active === '1A' && (
         <Section
-          label="2A"
+          label="1A"
           title="Heart Anatomy Overview"
           subtitle="Hover or click any structure to see its primary function and electrical behavior."
         >
-          <AnatomyDiagram selected={selected2A} onSelect={setSelected2A} />
+          <AnatomyDiagram selected={selected1A} onSelect={setSelected1A} />
           <Callout>
             The SA node is the heart's primary pacemaker — it fires spontaneously without any external trigger.
             The AV node imposes a deliberate delay that allows ventricular filling before systole. The
@@ -2682,9 +2682,9 @@ export default function CardiacBridge() {
         </Section>
       )}
 
-      {active === '2B' && (
+      {active === '1B' && (
         <Section
-          label="2B"
+          label="1B"
           title="Action Potentials by Cell Type"
           subtitle="Compare action potential shapes, follow their activation sequence, and use channel contributions to predict how each cell will respond."
         >
@@ -2698,9 +2698,9 @@ export default function CardiacBridge() {
         </Section>
       )}
 
-      {active === '2D' && (
+      {active === '1C' && (
         <Section
-          label="2D"
+          label="1C"
           title="Conduction Animation"
           subtitle="Follow a physiologically guided schematic of activation and recovery. Use the scrubber to examine each stage of the cardiac cycle."
         >

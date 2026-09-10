@@ -48,7 +48,7 @@ The ventricular baseline is normalized to 100%. The force waveform begins after 
 
 ## Conduction animation
 
-The 2D animation is an anatomically guided teaching schematic. It represents the sequence from SA node initiation through atrial activation, AV nodal delay, His bundle activation, bundle branch and Purkinje activation, ventricular myocardial activation, and regional recovery.
+The 1C animation is an anatomically guided teaching schematic. It represents the sequence from SA node initiation through atrial activation, AV nodal delay, His bundle activation, bundle branch and Purkinje activation, ventricular myocardial activation, and regional recovery.
 
 Curved paths represent specialized conduction tissue. Atrial activation expands from the SA node, while several ventricular fronts originate near the endocardial Purkinje network rather than moving as one planar wave. Repolarization is deliberately shown as soft, offset regions because activation time and action potential duration both influence recovery.
 

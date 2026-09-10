@@ -4,9 +4,9 @@ An interactive teaching app for undergraduate biomedical engineering students st
 
 This focused version is derived from the PCB3713C ECG Learning Platform and contains only the sections used by the cardiac action potentials laboratory:
 
-- 2A: cardiac anatomy
-- 2B: action potentials by cell type
-- 2D: cardiac conduction
+- 1A: cardiac anatomy
+- 1B: action potentials by cell type
+- 1C: cardiac conduction
 
 The app opens directly without authentication so students can keep it beside a Canvas New Quiz.
 
