@@ -1143,7 +1143,7 @@ function kBarColor(k) {
   return '#10b981'
 }
 
-const SPEEDS = [0.25, 0.5, 1]
+const SPEEDS = [0.25, 0.5, 0.75, 1]
 
 const TRACE_OPTIONS = [
   { id: 'sa', label: 'SA node', color: '#34d399' },
@@ -1197,7 +1197,7 @@ function LiveActionPotentials() {
   const [parasympathetic, setParasympathetic] = useState(20)
   const [kMEqL, setKMEqL] = useState(4.0)
   const [caMgDl, setCaMgDl] = useState(9.5)
-  const [speed, setSpeed] = useState(1)
+  const [speed, setSpeed] = useState(0.75)
 
   const phys = useMemo(
     () => computeAPPhysiology({ sympathetic, parasympathetic, kMEqL, caMgDl }),
@@ -1396,6 +1396,63 @@ function LiveActionPotentials() {
         excitation to ventricular myocytes.
       </p>
 
+      {/* Playback controls stay above the tracings so students can watch the
+          cursor, phase description, and ion channel indicators while they
+          pause or scrub. One baseline cycle takes about one second at the
+          default 0.75× study speed. */}
+      <div className="mb-3 rounded-xl border border-emerald-800/60 bg-gray-900/80 px-4 py-3">
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="text-sm font-semibold text-white">Playback and cardiac cycle position</h3>
+          <p className="text-xs text-gray-300">Choose 0.25× or 0.5× to examine channel changes closely.</p>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={toggle}
+            className="px-4 py-2 rounded-lg text-sm font-semibold border border-emerald-700 bg-emerald-950/60 hover:bg-emerald-900/60 text-white transition-colors"
+          >
+            {isPlaying ? 'Pause' : 'Play'}
+          </button>
+          <input
+            type="range"
+            min={0} max={phys.cycleMs}
+            value={Math.min(Math.max(tMs, 0), phys.cycleMs)}
+            onChange={e => scrub(Number(e.target.value))}
+            aria-label="Cardiac cycle position"
+            className="flex-1 min-w-[180px] accent-emerald-500"
+          />
+          <span className="text-xs font-mono font-medium text-gray-200 tabular-nums w-28">{Math.round(tMs)} / {Math.round(phys.cycleMs)} ms</span>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-gray-200">Playback speed</span>
+          {SPEEDS.map(s => (
+            <button
+              key={s}
+              onClick={() => setSpeed(s)}
+              aria-pressed={speed === s}
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-colors ${
+                speed === s
+                  ? 'bg-emerald-950/60 text-emerald-200 border-emerald-600'
+                  : 'bg-gray-800 text-gray-200 border-gray-600 hover:border-gray-400 hover:text-white'
+              }`}
+            >
+              {s}×{s === 0.75 ? ' · default' : ''}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              setSympathetic(20)
+              setParasympathetic(20)
+              setKMEqL(4.0)
+              setCaMgDl(9.5)
+            }}
+            className="ml-auto px-3 py-1.5 rounded-lg text-xs border border-gray-600 bg-gray-800 text-gray-200 hover:text-white hover:bg-gray-700 transition-colors"
+          >
+            Reset physiology
+          </button>
+        </div>
+      </div>
+
       <div className={lessonView === 'experiment' ? 'xl:grid xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-3' : ''}>
         <div className="min-w-0">
           <div className={`grid grid-cols-1 gap-2 items-stretch ${
@@ -1420,52 +1477,6 @@ function LiveActionPotentials() {
         </div>
 
         <div className={lessonView === 'experiment' ? 'xl:sticky xl:top-3 xl:self-start' : ''}>
-
-      {/* Playback controls — one clock drives all selected panels */}
-      <div className="flex items-center gap-3 flex-wrap mt-2 rounded-xl border border-gray-800 bg-gray-900/60 px-4 py-2">
-        <button
-          onClick={toggle}
-          className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-white transition-colors"
-        >
-          {isPlaying ? 'Pause' : 'Play'}
-        </button>
-        <input
-          type="range"
-          min={0} max={phys.cycleMs}
-          value={Math.min(Math.max(tMs, 0), phys.cycleMs)}
-          onChange={e => scrub(Number(e.target.value))}
-          aria-label="Cardiac cycle time"
-          className="flex-1 min-w-[120px] accent-emerald-500"
-        />
-        <span className="text-xs font-mono font-medium text-gray-200 tabular-nums w-28">{Math.round(tMs)} / {Math.round(phys.cycleMs)} ms</span>
-        <div className="flex items-center gap-1">
-          {SPEEDS.map(s => (
-            <button
-              key={s}
-              onClick={() => setSpeed(s)}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-mono border transition-colors ${
-                speed === s
-                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/50'
-                  : 'bg-gray-800 text-gray-200 border-gray-600 hover:text-white'
-              }`}
-            >
-              {s}×
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setSympathetic(20)
-            setParasympathetic(20)
-            setKMEqL(4.0)
-            setCaMgDl(9.5)
-          }}
-          className="px-3 py-1.5 rounded-lg text-xs border border-gray-700 bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
-        >
-          Reset physiology
-        </button>
-      </div>
 
       {lessonView === 'experiment' && (
         <>
@@ -2283,7 +2294,8 @@ function ECGVsAPSection({ rhythm }) {
 // same useLocalClock hook 2C already uses.
 function ConductionSection({ rhythm }) {
   const cycleMs = rhythm.cycleMs || CYCLE_MS
-  const { clockRef, tMs, isPlaying, toggle, scrub } = useLocalClock(cycleMs, rhythm.nativeCycleMs ?? null)
+  const [speed, setSpeed] = useState(0.75)
+  const { clockRef, tMs, isPlaying, toggle, scrub } = useLocalClock(cycleMs, rhythm.nativeCycleMs ?? null, speed)
   const stage = getTeachingConductionStage(tMs, cycleMs)
   const activeVelocityRows = {
     sa: ['SA Node'],
@@ -2306,6 +2318,77 @@ function ConductionSection({ rhythm }) {
 
   return (
     <div>
+      <div className="mb-4 rounded-xl border border-cyan-800/60 bg-gray-900/80 p-3">
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="text-sm font-semibold text-white">Playback and conduction sequence position</h3>
+          <p className="text-xs text-gray-300">Pause or choose a slower speed to read each stage as it appears.</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={toggle}
+            className="px-4 py-2 rounded-lg text-sm font-semibold border border-cyan-700 bg-cyan-950/60 hover:bg-cyan-900/60 text-white transition-colors"
+          >
+            {isPlaying ? 'Pause' : 'Play'}
+          </button>
+          <button
+            onClick={() => scrub((clockRef.current.tInCycle + 10) % cycleMs)}
+            className="px-3 py-2 rounded-lg text-xs font-medium border border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-200 transition-colors"
+          >
+            +10 ms
+          </button>
+          <button
+            onClick={() => scrub(0)}
+            className="px-3 py-2 rounded-lg text-xs font-medium border border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-200 transition-colors"
+          >
+            Reset position
+          </button>
+          <span className="ml-auto text-xs font-mono font-medium text-gray-200 tabular-nums">{Math.round(tMs)} / {Math.round(cycleMs)} ms</span>
+        </div>
+
+        <div className="mt-3">
+          <input
+            type="range"
+            min={0}
+            max={cycleMs}
+            value={Math.round(tMs)}
+            onChange={e => scrub(Number(e.target.value))}
+            aria-label="Cardiac conduction sequence position"
+            className="w-full accent-cyan-500"
+          />
+          <div className="relative mt-2 hidden h-8 text-xs font-medium leading-tight text-gray-300 sm:block">
+            {[
+              ['Atrial activation', '11.8%'],
+              ['AV delay', '26%'],
+              ['His–Purkinje', '41.5%'],
+              ['Ventricular activation', '57.5%'],
+              ['Repolarization', '78%'],
+            ].map(([label, left]) => (
+              <span key={label} className="absolute w-28 -translate-x-1/2 text-center" style={{ left }}>
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-gray-700 pt-2">
+          <span className="text-xs font-semibold text-gray-200">Playback speed</span>
+          {SPEEDS.map(s => (
+            <button
+              key={s}
+              onClick={() => setSpeed(s)}
+              aria-pressed={speed === s}
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-colors ${
+                speed === s
+                  ? 'bg-cyan-950/60 text-cyan-200 border-cyan-600'
+                  : 'bg-gray-800 text-gray-200 border-gray-600 hover:border-gray-400 hover:text-white'
+              }`}
+            >
+              {s}×{s === 0.75 ? ' · default' : ''}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex flex-col xl:flex-row gap-4 items-start mb-4">
         <div className="relative rounded-xl border border-gray-800 overflow-hidden shrink-0 max-w-full">
           <TeachingConductionAnimation timeMs={tMs} cycleMs={cycleMs} />
@@ -2337,55 +2420,6 @@ function ConductionSection({ rhythm }) {
             <p className="mt-2 border-t border-gray-700 pt-2 text-xs leading-relaxed text-gray-300">
               Reference ranges describe tissue conduction. Pixel distance and animation speed do not represent measured velocity.
             </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-3">
-        <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={toggle}
-          className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-white transition-colors"
-        >
-          {isPlaying ? 'Pause' : 'Play'}
-        </button>
-        <button
-          onClick={() => scrub((clockRef.current.tInCycle + 10) % cycleMs)}
-          className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
-        >
-          +10 ms
-        </button>
-        <button
-          onClick={() => scrub(0)}
-          className="px-4 py-1.5 rounded-lg text-xs font-medium border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
-        >
-          Reset
-        </button>
-          <span className="ml-auto text-xs font-mono font-medium text-gray-200 tabular-nums">{Math.round(tMs)} / {Math.round(cycleMs)} ms</span>
-        </div>
-
-        <div className="mt-3">
-        <input
-          type="range"
-          min={0}
-          max={cycleMs}
-          value={Math.round(tMs)}
-          onChange={e => scrub(Number(e.target.value))}
-            aria-label="Cardiac conduction sequence time"
-            className="w-full accent-cyan-500"
-        />
-          <div className="relative mt-2 hidden h-8 text-xs font-medium leading-tight text-gray-300 sm:block">
-            {[
-              ['Atrial activation', '11.8%'],
-              ['AV delay', '26%'],
-              ['His–Purkinje', '41.5%'],
-              ['Ventricular activation', '57.5%'],
-              ['Repolarization', '78%'],
-            ].map(([label, left]) => (
-              <span key={label} className="absolute w-28 -translate-x-1/2 text-center" style={{ left }}>
-                {label}
-              </span>
-            ))}
           </div>
         </div>
       </div>
