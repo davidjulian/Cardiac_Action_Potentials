@@ -1442,7 +1442,7 @@ function LiveActionPotentials() {
                   : 'bg-gray-800 text-gray-200 border-gray-600 hover:border-gray-400 hover:text-white'
               }`}
             >
-              {playbackRateLabel(s)}{s === 0.1 ? ' · default' : ''}
+              {playbackRateLabel(s)}
             </button>
           ))}
           <button
@@ -2391,7 +2391,7 @@ function ConductionSection({ rhythm }) {
                   : 'bg-gray-800 text-gray-200 border-gray-600 hover:border-gray-400 hover:text-white'
               }`}
             >
-              {playbackRateLabel(s)}{s === 0.1 ? ' · default' : ''}
+              {playbackRateLabel(s)}
             </button>
           ))}
         </div>
