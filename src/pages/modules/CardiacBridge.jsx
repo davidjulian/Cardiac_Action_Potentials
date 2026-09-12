@@ -1143,7 +1143,13 @@ function kBarColor(k) {
   return '#10b981'
 }
 
-const SPEEDS = [0.25, 0.5, 0.75, 1]
+const SPEEDS = [0.1, 1]
+
+function playbackRateLabel(timeScale) {
+  return timeScale === 0.1
+    ? 'Study rate · 0.1× real time'
+    : 'Real time · 1×'
+}
 
 const TRACE_OPTIONS = [
   { id: 'sa', label: 'SA node', color: '#34d399' },
@@ -1197,7 +1203,7 @@ function LiveActionPotentials() {
   const [parasympathetic, setParasympathetic] = useState(20)
   const [kMEqL, setKMEqL] = useState(4.0)
   const [caMgDl, setCaMgDl] = useState(9.5)
-  const [speed, setSpeed] = useState(0.75)
+  const [speed, setSpeed] = useState(0.1)
 
   const phys = useMemo(
     () => computeAPPhysiology({ sympathetic, parasympathetic, kMEqL, caMgDl }),
@@ -1398,12 +1404,12 @@ function LiveActionPotentials() {
 
       {/* Playback controls stay above the tracings so students can watch the
           cursor, phase description, and ion channel indicators while they
-          pause or scrub. One baseline cycle takes about one second at the
-          default 0.75× study speed. */}
+          pause or scrub. The default study rate slows physiological time
+          enough for students to observe the changing signals. */}
       <div className="mb-3 rounded-xl border border-emerald-800/60 bg-gray-900/80 px-4 py-3">
         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-sm font-semibold text-white">Playback and cardiac cycle position</h3>
-          <p className="text-xs text-gray-300">Choose 0.25× or 0.5× to examine channel changes closely.</p>
+          <p className="text-xs text-gray-300">Use Study rate for observation; use Real time to appreciate the physiological pace.</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <button
@@ -1423,19 +1429,20 @@ function LiveActionPotentials() {
           <span className="text-xs font-mono font-medium text-gray-200 tabular-nums w-28">{Math.round(tMs)} / {Math.round(phys.cycleMs)} ms</span>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-gray-200">Playback speed</span>
+          <span className="text-xs font-semibold text-gray-200">Animation rate</span>
           {SPEEDS.map(s => (
             <button
               key={s}
               onClick={() => setSpeed(s)}
               aria-pressed={speed === s}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-colors ${
+              aria-label={`Set animation to ${playbackRateLabel(s)}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                 speed === s
                   ? 'bg-emerald-950/60 text-emerald-200 border-emerald-600'
                   : 'bg-gray-800 text-gray-200 border-gray-600 hover:border-gray-400 hover:text-white'
               }`}
             >
-              {s}×{s === 0.75 ? ' · default' : ''}
+              {playbackRateLabel(s)}{s === 0.1 ? ' · default' : ''}
             </button>
           ))}
           <button
@@ -2294,7 +2301,7 @@ function ECGVsAPSection({ rhythm }) {
 // same useLocalClock hook 2C already uses.
 function ConductionSection({ rhythm }) {
   const cycleMs = rhythm.cycleMs || CYCLE_MS
-  const [speed, setSpeed] = useState(0.75)
+  const [speed, setSpeed] = useState(0.1)
   const { clockRef, tMs, isPlaying, toggle, scrub } = useLocalClock(cycleMs, rhythm.nativeCycleMs ?? null, speed)
   const stage = getTeachingConductionStage(tMs, cycleMs)
   const activeVelocityRows = {
@@ -2321,7 +2328,7 @@ function ConductionSection({ rhythm }) {
       <div className="mb-4 rounded-xl border border-cyan-800/60 bg-gray-900/80 p-3">
         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-sm font-semibold text-white">Playback and conduction sequence position</h3>
-          <p className="text-xs text-gray-300">Pause or choose a slower speed to read each stage as it appears.</p>
+          <p className="text-xs text-gray-300">Use Study rate to read each stage; use Real time to appreciate the physiological pace.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -2371,19 +2378,20 @@ function ConductionSection({ rhythm }) {
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-gray-700 pt-2">
-          <span className="text-xs font-semibold text-gray-200">Playback speed</span>
+          <span className="text-xs font-semibold text-gray-200">Animation rate</span>
           {SPEEDS.map(s => (
             <button
               key={s}
               onClick={() => setSpeed(s)}
               aria-pressed={speed === s}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-colors ${
+              aria-label={`Set animation to ${playbackRateLabel(s)}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                 speed === s
                   ? 'bg-cyan-950/60 text-cyan-200 border-cyan-600'
                   : 'bg-gray-800 text-gray-200 border-gray-600 hover:border-gray-400 hover:text-white'
               }`}
             >
-              {s}×{s === 0.75 ? ' · default' : ''}
+              {playbackRateLabel(s)}{s === 0.1 ? ' · default' : ''}
             </button>
           ))}
         </div>
