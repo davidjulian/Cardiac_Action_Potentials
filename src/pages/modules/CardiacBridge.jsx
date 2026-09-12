@@ -2400,7 +2400,7 @@ function ConductionSection({ rhythm }) {
             <div className="text-lg font-semibold text-white min-h-[28px]">{stage.label}</div>
             <div className="mt-3 text-xs font-semibold uppercase tracking-wider text-gray-300">Participating structures</div>
             <div className="mt-1 text-sm text-emerald-300 min-h-[20px]">{stage.structures}</div>
-            <div className="mt-3 min-h-[44px]">
+            <div className="mt-3 min-h-[3.5rem]">
               <p className="text-sm text-gray-200 leading-relaxed">{stage.note}</p>
             </div>
           </div>
