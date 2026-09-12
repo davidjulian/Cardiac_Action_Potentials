@@ -45,7 +45,7 @@ export const TEACHING_CONDUCTION_STAGES = [
     end: 0.66,
     label: 'Ventricular myocardial activation',
     structures: 'Interventricular septum and right and left ventricular myocardium',
-    note: 'Multiple wavefronts begin in apical and septal endocardial regions, then spread through the ventricular walls and generally upward toward the base.',
+    note: 'Excitation spreads through the septum and ventricular walls from early endocardial activation sites, with much of the visible progression toward the base.',
   },
   {
     id: 'repolarization',
@@ -53,7 +53,7 @@ export const TEACHING_CONDUCTION_STAGES = [
     end: 0.90,
     label: 'Ventricular repolarization',
     structures: 'Ventricular myocardium',
-    note: 'Recovery often begins in apical and epicardial regions and proceeds generally toward basal and endocardial regions; it does not simply reverse activation.',
+    note: 'Regions recover at different times because both activation time and local action potential duration determine when repolarization occurs.',
   },
   {
     id: 'rest',
