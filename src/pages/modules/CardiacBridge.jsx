@@ -77,7 +77,7 @@ const ANATOMY = {
   rv: {
     name: 'Right Ventricle',
     apType: 'myocyte',
-    fn: 'Pumps deoxygenated blood into the pulmonary circulation via the pulmonary artery at low pressure (~25 mmHg systolic). Thin-walled, crescent-shaped in cross-section.',
+    fn: 'Pumps deoxygenated blood into the pulmonary circulation via the pulmonary artery at low pressure (~25 mmHg systolic). It is thin walled and crescent shaped in transverse section, wrapping anteriorly around the LV. Its narrower appearance in a longitudinal cutaway does not mean it has a smaller chamber volume; in steady state, both ventricles eject the same stroke volume.',
     electrical: 'Activated by right bundle branch via Purkinje network, endocardium to epicardium. Myocyte action potential (Phases 0–4). Thinner wall means smaller contribution to QRS than LV.',
     ECG: 'Right ventricular hypertrophy → right axis deviation, dominant R in V1 (R > S). RV infarction (often with inferior STEMI) → ST elevation in V3R–V4R.',
   },

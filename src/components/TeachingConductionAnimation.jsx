@@ -39,7 +39,6 @@ function TracedPath({ d, progress, color = '#fde047', width = 4, opacity = 1 }) 
 // direction without implying a quantitatively mapped activation boundary.
 function DirectionalActivationPath({ d, progress, trailWidth, opacity }) {
   const visibleProgress = clamp01(progress)
-  const frontLength = 0.075
   return (
     <>
       <TracedPath
@@ -49,20 +48,33 @@ function DirectionalActivationPath({ d, progress, trailWidth, opacity }) {
         width={trailWidth}
         opacity={opacity}
       />
-      <path
+      <MovingFrontPath
         d={d}
-        pathLength="1"
-        fill="none"
-        stroke="#fde047"
-        strokeWidth="7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeDasharray={`${frontLength} ${1 - frontLength}`}
-        strokeDashoffset={1 - visibleProgress}
-        opacity={visibleProgress > 0 && visibleProgress < 1 ? 0.92 : 0}
-        filter="url(#teaching-soft-glow)"
+        progress={visibleProgress}
+        color="#fde047"
+        width={7}
+        opacity={0.92}
       />
     </>
+  )
+}
+
+function MovingFrontPath({ d, progress, color, width, opacity = 1, frontLength = 0.075 }) {
+  const visibleProgress = clamp01(progress)
+  return (
+    <path
+      d={d}
+      pathLength="1"
+      fill="none"
+      stroke={color}
+      strokeWidth={width}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeDasharray={`${frontLength} ${1 - frontLength}`}
+      strokeDashoffset={1 - visibleProgress}
+      opacity={visibleProgress > 0 && visibleProgress < 1 ? opacity : 0}
+      filter="url(#teaching-soft-glow)"
+    />
   )
 }
 
@@ -72,12 +84,17 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
 
   const saPulse = bell(fraction, 0, 0.075)
   const atrialProgress = ramp(fraction, 0.055, 0.18)
-  const atrialDepolarized = ramp(fraction, 0.055, 0.17) * (1 - ramp(fraction, 0.48, 0.64))
+  const atrialRecoveryFade = 1 - ramp(fraction, 0.48, 0.66)
+  const rightAtrialLateralProgress = ramp(fraction, 0.055, 0.17)
+  const rightAtrialSeptalProgress = ramp(fraction, 0.06, 0.18)
   // The schematic pathway must reach the left atrium before the left atrial
   // fill begins. This changes only the drawn travel rate, not the established
   // timing of right and left atrial myocardial activation.
   const bachmannProgress = ramp(atrialProgress, 0.05, 0.35)
-  const atrialRecovery = bell(fraction, 0.48, 0.66)
+  const leftAtrialLateralProgress = ramp(fraction, 0.10, 0.195)
+  const leftAtrialSeptalProgress = ramp(fraction, 0.105, 0.21)
+  const rightAtrialRecoveryProgress = ramp(fraction, 0.48, 0.625)
+  const leftAtrialRecoveryProgress = ramp(fraction, 0.515, 0.66)
   const avPulse = bell(fraction, 0.18, 0.34)
   const hisProgress = ramp(fraction, 0.34, 0.40)
   // Show the specialized pathway in anatomical sequence. The bundle branch
@@ -91,35 +108,35 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
   const leftVentricleProgress = ramp(fraction, 0.50, 0.645)
   const apicalSeptalProgress = ramp(fraction, 0.505, 0.655)
   const ventricularDepolarized = ramp(fraction, 0.49, 0.64) * (1 - ramp(fraction, 0.68, 0.90))
-  const ventricularRecovery = bell(fraction, 0.66, 0.91)
-
-  const atrialRadius = 18 + 132 * atrialProgress
-  const leftAtrialRadius = Math.max(0, 92 * ramp(atrialProgress, 0.35, 1))
-
-  const rvWall = 'M103 210 C71 236 66 304 105 354 C128 383 165 397 194 391 C174 356 162 322 164 280 C165 247 151 218 124 207 Z'
-  const lvWall = 'M219 198 C190 225 184 268 191 315 C197 358 220 397 251 402 C289 385 314 336 312 278 C310 229 280 190 245 185 Z'
-  const rightAtrium = 'M88 96 C58 111 51 161 72 198 C91 225 131 226 157 201 C169 180 163 130 141 103 C128 87 106 87 88 96 Z'
-  const leftAtrium = 'M236 91 C207 102 195 136 204 171 C215 199 253 210 286 193 C310 178 313 136 294 108 C280 88 257 84 236 91 Z'
+  const leftEpicardialRecoveryProgress = ramp(fraction, 0.66, 0.86)
+  const rightEpicardialRecoveryProgress = ramp(fraction, 0.68, 0.88)
+  const septalEndocardialRecoveryProgress = ramp(fraction, 0.73, 0.91)
 
   return (
     <div className="relative w-[390px] max-w-full bg-[#080d18]">
-      <svg viewBox="0 0 380 440" className="block h-auto w-full" role="img" aria-label="Schematic cardiac conduction animation">
+      <svg viewBox={HEART_VIEW_BOX} className="block h-auto w-full" role="img" aria-label="Schematic cardiac conduction animation">
         <defs>
           <filter id="teaching-soft-glow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="4" result="blur" />
             <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
-          <clipPath id="teaching-atria-clip">
-            <path d={rightAtrium} />
-            <path d={leftAtrium} />
-          </clipPath>
-          <clipPath id="teaching-ventricle-clip">
-            <path d={rvWall} />
-            <path d={lvWall} />
-          </clipPath>
+          <mask id="teaching-atria-wall-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="380" height="420">
+            <rect width="380" height="420" fill="black" />
+            <path d={RIGHT_ATRIUM} fill="white" />
+            <path d={LEFT_ATRIUM} fill="white" />
+            <path d={RIGHT_ATRIUM_CAVITY} fill="black" />
+            <path d={LEFT_ATRIUM_CAVITY} fill="black" />
+          </mask>
+          <mask id="teaching-ventricular-wall-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="380" height="420">
+            <rect width="380" height="420" fill="black" />
+            <path d={RIGHT_VENTRICLE} fill="white" />
+            <path d={LEFT_VENTRICLE} fill="white" />
+            <path d={RIGHT_VENTRICLE_CAVITY} fill="black" />
+            <path d={LEFT_VENTRICLE_CAVITY} fill="black" />
+          </mask>
         </defs>
 
-        <rect width="380" height="440" fill="#080d18" />
+        <rect width="380" height="535" fill="#080d18" />
 
         {/* Great vessels, deliberately simplified. */}
         <path d="M250 92 C242 52 258 29 284 25 C310 22 325 44 322 70" fill="none" stroke="#783f3b" strokeWidth="20" strokeLinecap="round" />
@@ -127,24 +144,88 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
         <path d="M110 196 L99 233" fill="none" stroke="#6f4547" strokeWidth="15" strokeLinecap="round" />
 
         {/* Resting myocardium. */}
-        <path d={rightAtrium} fill="#4b292b" stroke="#a56661" strokeWidth="2" />
-        <path d={leftAtrium} fill="#4b292b" stroke="#a56661" strokeWidth="2" />
-        <path d={rvWall} fill="#4b292b" stroke="#a56661" strokeWidth="2" />
-        <path d={lvWall} fill="#4b292b" stroke="#a56661" strokeWidth="2" />
+        <path d={RIGHT_ATRIUM} fill="#4b292b" stroke="#a56661" strokeWidth="2" />
+        <path d={LEFT_ATRIUM} fill="#4b292b" stroke="#a56661" strokeWidth="2" />
+        <path d={RIGHT_VENTRICLE} fill="#4b292b" stroke="#a56661" strokeWidth="2" />
+        <path d={LEFT_VENTRICLE} fill="#5b3032" stroke="#a56661" strokeWidth="2" />
 
-        {/* Chamber cavities keep the drawing recognizably schematic. */}
-        <path d="M105 226 C84 250 86 307 116 343 C128 358 145 366 160 365 C146 330 143 289 149 253 C145 234 128 221 105 226 Z" fill="#161923" stroke="#7d4a49" strokeWidth="1.5" />
-        <path d="M239 211 C212 233 207 278 214 321 C220 353 233 374 249 382 C272 363 288 323 286 278 C284 238 264 207 239 211 Z" fill="#161923" stroke="#7d4a49" strokeWidth="1.5" />
-        <path d="M181 190 C184 235 178 301 194 374" fill="none" stroke="#b26d66" strokeWidth="8" strokeLinecap="round" />
+        {/* All four chambers use a cutaway convention. The walls are
+            intentionally exaggerated for visibility. */}
+        <path d={RIGHT_ATRIUM_CAVITY} fill="#161923" stroke="#7d4a49" strokeWidth="1.5" />
+        <path d={LEFT_ATRIUM_CAVITY} fill="#161923" stroke="#7d4a49" strokeWidth="1.5" />
+        <path d={RIGHT_VENTRICLE_CAVITY} fill="#161923" stroke="#7d4a49" strokeWidth="1.5" />
+        <path d={LEFT_VENTRICLE_CAVITY} fill="#161923" stroke="#7d4a49" strokeWidth="1.5" />
+        <path d={SEPTUM} fill="#293444" stroke="#8491a3" strokeWidth="1.5" />
 
-        {/* Atrial tissue stays warm behind an organic radial activation front. */}
-        <g clipPath="url(#teaching-atria-clip)">
-          <circle cx="121" cy="113" r={atrialRadius} fill="#e96b50" opacity={0.82 * atrialDepolarized} />
-          <circle cx="230" cy="126" r={leftAtrialRadius} fill="#e96b50" opacity={0.82 * atrialDepolarized} />
-          <circle cx="121" cy="113" r={atrialRadius} fill="none" stroke="#fde047" strokeWidth="7" opacity={atrialProgress < 1 ? 0.9 : 0} filter="url(#teaching-soft-glow)" />
-          <circle cx="230" cy="126" r={leftAtrialRadius} fill="none" stroke="#fde047" strokeWidth="6" opacity={leftAtrialRadius > 0 && atrialProgress < 1 ? 0.8 : 0} />
-          <circle cx="105" cy="160" r={38 + 90 * atrialRecovery} fill="none" stroke="#38bdf8" strokeWidth="26" opacity={0.52 * atrialRecovery} />
-          <circle cx="258" cy="151" r={25 + 65 * atrialRecovery} fill="none" stroke="#38bdf8" strokeWidth="23" opacity={0.45 * atrialRecovery} />
+        {/* Atrial activation follows broad curved paths rather than circular
+            waves. Right atrial myocardium activates from the SA node first;
+            left atrial fronts begin only after Bachmann's bundle arrives. */}
+        <g mask="url(#teaching-atria-wall-mask)">
+          <path
+            d={RIGHT_ATRIUM}
+            fill="#e96b50"
+            opacity={0.72 * ramp(fraction, 0.16, 0.18) * atrialRecoveryFade}
+          />
+          <path
+            d={LEFT_ATRIUM}
+            fill="#e96b50"
+            opacity={0.72 * ramp(fraction, 0.195, 0.21) * atrialRecoveryFade}
+          />
+          <DirectionalActivationPath
+            d="M121 113 C96 119 76 145 79 174 C82 200 105 216 139 202"
+            progress={rightAtrialLateralProgress}
+            trailWidth={50}
+            opacity={0.78 * atrialRecoveryFade}
+          />
+          <DirectionalActivationPath
+            d="M121 113 C140 126 157 143 174 160 C181 169 185 181 188 194"
+            progress={rightAtrialSeptalProgress}
+            trailWidth={42}
+            opacity={0.76 * atrialRecoveryFade}
+          />
+          <DirectionalActivationPath
+            d="M121 113 C118 141 120 174 137 202"
+            progress={rightAtrialLateralProgress}
+            trailWidth={48}
+            opacity={0.76 * atrialRecoveryFade}
+          />
+          <DirectionalActivationPath
+            d="M230 126 C252 104 282 111 296 137 C310 163 292 191 260 199"
+            progress={leftAtrialLateralProgress}
+            trailWidth={50}
+            opacity={0.78 * atrialRecoveryFade}
+          />
+          <DirectionalActivationPath
+            d="M230 126 C211 140 208 164 219 184 C228 199 247 204 265 198"
+            progress={leftAtrialSeptalProgress}
+            trailWidth={42}
+            opacity={0.76 * atrialRecoveryFade}
+          />
+          <DirectionalActivationPath
+            d="M230 126 C242 146 248 174 260 199"
+            progress={leftAtrialLateralProgress}
+            trailWidth={48}
+            opacity={0.76 * atrialRecoveryFade}
+          />
+
+          {/* Recovery is staggered across the atria. The cyan bands mark a
+              moving recovery region; they do not imply a measured front. */}
+          <MovingFrontPath
+            d="M112 119 C91 139 86 172 101 198 C112 213 132 215 151 202"
+            progress={rightAtrialRecoveryProgress}
+            color="#38bdf8"
+            width={24}
+            opacity={0.62}
+            frontLength={0.18}
+          />
+          <MovingFrontPath
+            d="M235 126 C260 112 288 128 294 154 C298 179 278 198 248 199"
+            progress={leftAtrialRecoveryProgress}
+            color="#38bdf8"
+            width={24}
+            opacity={0.58}
+            frontLength={0.18}
+          />
         </g>
 
         {/* Nodes and named conduction pathways. */}
@@ -185,7 +266,7 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
             then spread through the walls and generally upward toward the
             base. This preserves the important sequence without presenting
             four simultaneous, isotropically expanding point sources. */}
-        <g clipPath="url(#teaching-ventricle-clip)">
+        <g mask="url(#teaching-ventricular-wall-mask)">
           <DirectionalActivationPath
             d="M207 237 C195 235 183 238 169 247"
             progress={septalProgress}
@@ -211,10 +292,34 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
             opacity={0.76 * ventricularDepolarized}
           />
 
-          {/* Soft, offset recovery patches intentionally avoid a single precise front. */}
-          <circle cx="104" cy="245" r={25 + 105 * ventricularRecovery} fill="none" stroke="#38bdf8" strokeWidth="34" opacity={0.45 * ventricularRecovery} />
-          <circle cx="292" cy="254" r={18 + 96 * ventricularRecovery} fill="none" stroke="#38bdf8" strokeWidth="30" opacity={0.40 * ventricularRecovery} />
-          <circle cx="213" cy="378" r={15 + 105 * ventricularRecovery} fill="none" stroke="#2563eb" strokeWidth="28" opacity={0.35 * ventricularRecovery} />
+          {/* Ventricular recovery begins in apical and epicardial regions and
+              proceeds generally toward basal and endocardial regions. The
+              staggered bands emphasize that it is not simply depolarization
+              played backward. */}
+          <MovingFrontPath
+            d="M274 350 C294 318 298 278 284 244 C275 221 258 204 238 194"
+            progress={leftEpicardialRecoveryProgress}
+            color="#38bdf8"
+            width={30}
+            opacity={0.62}
+            frontLength={0.16}
+          />
+          <MovingFrontPath
+            d="M111 350 C88 320 78 285 87 252 C94 228 107 211 126 199"
+            progress={rightEpicardialRecoveryProgress}
+            color="#38bdf8"
+            width={28}
+            opacity={0.58}
+            frontLength={0.16}
+          />
+          <MovingFrontPath
+            d="M203 370 C193 337 187 302 190 268 C192 238 197 216 205 198"
+            progress={septalEndocardialRecoveryProgress}
+            color="#2563eb"
+            width={24}
+            opacity={0.52}
+            frontLength={0.17}
+          />
         </g>
 
         {/* Labels are few and large enough to reinforce the pathway. */}
@@ -222,19 +327,21 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
           <text x="16" y="20" fill="#cbd5e1">Patient’s right ←</text>
           <text x="268" y="58" fill="#cbd5e1">→ Patient’s left</text>
           <text x="77" y="82">SA node</text>
-          <text x="101" y="178">RA</text>
-          <text x="263" y="168">LA</text>
+          <text x="108" y="164">RA</text>
+          <text x="255" y="158">LA</text>
           <text x="153" y="151">AV node</text>
           <text x="205" y="195">His</text>
-          <text x="91" y="392">RV</text>
-          <text x="278" y="397">LV</text>
+          <text x="105" y="384">RV</text>
+          <text x="281" y="402">LV</text>
         </g>
 
-        <g transform="translate(16 414)" fontFamily="system-ui, sans-serif" fontSize="11" fontWeight="600">
+        <g transform="translate(16 422)" fontFamily="system-ui, sans-serif" fontSize="11" fontWeight="600">
           <circle cx="5" cy="0" r="5" fill="#fde047" /><text x="15" y="4" fill="#e5e7eb">depolarizing front</text>
           <rect x="128" y="-5" width="10" height="10" rx="2" fill="#e96b50" /><text x="145" y="4" fill="#e5e7eb">depolarized</text>
           <circle cx="240" cy="0" r="5" fill="#38bdf8" /><text x="250" y="4" fill="#e5e7eb">repolarizing</text>
         </g>
+
+        <TransverseVentricularInset prefix="Conduction animation" />
       </svg>
       <div className="absolute right-2 top-2 rounded-md border border-gray-600 bg-gray-950/90 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-200">
         Schematic · not to scale
@@ -242,3 +349,16 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
     </div>
   )
 }
+import {
+  HEART_VIEW_BOX,
+  RIGHT_ATRIUM,
+  LEFT_ATRIUM,
+  RIGHT_ATRIUM_CAVITY,
+  LEFT_ATRIUM_CAVITY,
+  RIGHT_VENTRICLE,
+  LEFT_VENTRICLE,
+  RIGHT_VENTRICLE_CAVITY,
+  LEFT_VENTRICLE_CAVITY,
+  SEPTUM,
+} from '../lib/teachingHeartGeometry'
+import TransverseVentricularInset from './TransverseVentricularInset'

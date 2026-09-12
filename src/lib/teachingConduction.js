@@ -53,7 +53,7 @@ export const TEACHING_CONDUCTION_STAGES = [
     end: 0.90,
     label: 'Ventricular repolarization',
     structures: 'Ventricular myocardium',
-    note: 'Ventricular regions recover at different times because activation time and action potential duration both matter.',
+    note: 'Recovery often begins in apical and epicardial regions and proceeds generally toward basal and endocardial regions; it does not simply reverse activation.',
   },
   {
     id: 'rest',
