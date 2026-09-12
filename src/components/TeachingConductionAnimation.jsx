@@ -44,7 +44,12 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
   const atrialRecovery = bell(fraction, 0.48, 0.66)
   const avPulse = bell(fraction, 0.18, 0.34)
   const hisProgress = ramp(fraction, 0.34, 0.40)
-  const purkinjeProgress = ramp(fraction, 0.40, 0.49)
+  // Show the specialized pathway in anatomical sequence. The bundle branch
+  // wave reaches the apical endpoints before the terminal Purkinje fans
+  // illuminate, avoiding the misleading appearance that distal fibers
+  // activate ahead of the wave traveling down the branches.
+  const bundleBranchProgress = ramp(fraction, 0.40, 0.44)
+  const purkinjeProgress = ramp(fraction, 0.44, 0.49)
   const ventricularProgress = ramp(fraction, 0.49, 0.66)
   const ventricularDepolarized = ramp(fraction, 0.49, 0.64) * (1 - ramp(fraction, 0.68, 0.90))
   const ventricularRecovery = bell(fraction, 0.66, 0.91)
@@ -124,8 +129,8 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
         <TracedPath d="M190 164 C191 179 194 190 197 204" progress={hisProgress} width={5} opacity={1 - ramp(fraction, 0.40, 0.47)} />
 
         <path d="M197 204 C188 235 174 273 158 325 M197 204 C215 236 235 276 252 337" fill="none" stroke="#596273" strokeWidth="3.5" strokeLinecap="round" />
-        <TracedPath d="M197 204 C188 235 174 273 158 325" progress={purkinjeProgress} width={5} opacity={1 - ramp(fraction, 0.49, 0.60)} />
-        <TracedPath d="M197 204 C215 236 235 276 252 337" progress={purkinjeProgress} width={5} opacity={1 - ramp(fraction, 0.49, 0.60)} />
+        <TracedPath d="M197 204 C188 235 174 273 158 325" progress={bundleBranchProgress} width={5} opacity={1 - ramp(fraction, 0.49, 0.60)} />
+        <TracedPath d="M197 204 C215 236 235 276 252 337" progress={bundleBranchProgress} width={5} opacity={1 - ramp(fraction, 0.49, 0.60)} />
 
         {/* Purkinje fans branch toward several endocardial activation sites. */}
         <g stroke="#596273" strokeWidth="2" fill="none" strokeLinecap="round">

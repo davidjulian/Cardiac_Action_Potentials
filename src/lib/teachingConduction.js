@@ -37,7 +37,7 @@ export const TEACHING_CONDUCTION_STAGES = [
     end: 0.49,
     label: 'Bundle branch and Purkinje activation',
     structures: 'Right and left bundle branches and Purkinje fibers',
-    note: 'Rapid specialized conduction distributes excitation toward the apex and ventricular endocardium.',
+    note: 'Excitation travels rapidly down the bundle branches toward the apex, then spreads through Purkinje fibers across the ventricular endocardium.',
   },
   {
     id: 'ventricles',
@@ -45,7 +45,7 @@ export const TEACHING_CONDUCTION_STAGES = [
     end: 0.66,
     label: 'Ventricular myocardial activation',
     structures: 'Interventricular septum and right and left ventricular myocardium',
-    note: 'Multiple wavefronts spread from endocardial activation sites through the ventricular walls.',
+    note: 'Multiple wavefronts begin in apical and septal endocardial regions, then spread through the ventricular walls and generally upward toward the base.',
   },
   {
     id: 'repolarization',
