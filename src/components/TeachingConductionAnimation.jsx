@@ -34,6 +34,38 @@ function TracedPath({ d, progress, color = '#fde047', width = 4, opacity = 1 }) 
   )
 }
 
+// A broad warm trail marks myocardium that has depolarized, while a short
+// bright segment marks the leading edge. Curved paths communicate general
+// direction without implying a quantitatively mapped activation boundary.
+function DirectionalActivationPath({ d, progress, trailWidth, opacity }) {
+  const visibleProgress = clamp01(progress)
+  const frontLength = 0.075
+  return (
+    <>
+      <TracedPath
+        d={d}
+        progress={visibleProgress}
+        color="#e96b50"
+        width={trailWidth}
+        opacity={opacity}
+      />
+      <path
+        d={d}
+        pathLength="1"
+        fill="none"
+        stroke="#fde047"
+        strokeWidth="7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeDasharray={`${frontLength} ${1 - frontLength}`}
+        strokeDashoffset={1 - visibleProgress}
+        opacity={visibleProgress > 0 && visibleProgress < 1 ? 0.92 : 0}
+        filter="url(#teaching-soft-glow)"
+      />
+    </>
+  )
+}
+
 export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
   const rawFraction = cycleMs > 0 ? timeMs / cycleMs : 0
   const fraction = rawFraction - Math.floor(rawFraction)
@@ -41,6 +73,10 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
   const saPulse = bell(fraction, 0, 0.075)
   const atrialProgress = ramp(fraction, 0.055, 0.18)
   const atrialDepolarized = ramp(fraction, 0.055, 0.17) * (1 - ramp(fraction, 0.48, 0.64))
+  // The schematic pathway must reach the left atrium before the left atrial
+  // fill begins. This changes only the drawn travel rate, not the established
+  // timing of right and left atrial myocardial activation.
+  const bachmannProgress = ramp(atrialProgress, 0.05, 0.35)
   const atrialRecovery = bell(fraction, 0.48, 0.66)
   const avPulse = bell(fraction, 0.18, 0.34)
   const hisProgress = ramp(fraction, 0.34, 0.40)
@@ -50,13 +86,15 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
   // activate ahead of the wave traveling down the branches.
   const bundleBranchProgress = ramp(fraction, 0.40, 0.44)
   const purkinjeProgress = ramp(fraction, 0.44, 0.49)
-  const ventricularProgress = ramp(fraction, 0.49, 0.66)
+  const septalProgress = ramp(fraction, 0.49, 0.545)
+  const rightVentricleProgress = ramp(fraction, 0.50, 0.66)
+  const leftVentricleProgress = ramp(fraction, 0.50, 0.645)
+  const apicalSeptalProgress = ramp(fraction, 0.505, 0.655)
   const ventricularDepolarized = ramp(fraction, 0.49, 0.64) * (1 - ramp(fraction, 0.68, 0.90))
   const ventricularRecovery = bell(fraction, 0.66, 0.91)
 
   const atrialRadius = 18 + 132 * atrialProgress
   const leftAtrialRadius = Math.max(0, 92 * ramp(atrialProgress, 0.35, 1))
-  const ventricularRadius = 8 + 115 * ventricularProgress
 
   const rvWall = 'M103 210 C71 236 66 304 105 354 C128 383 165 397 194 391 C174 356 162 322 164 280 C165 247 151 218 124 207 Z'
   const lvWall = 'M219 198 C190 225 184 268 191 315 C197 358 220 397 251 402 C289 385 314 336 312 278 C310 229 280 190 245 185 Z'
@@ -122,7 +160,7 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
         <path d="M127 119 C145 130 168 140 188 153" fill="none" stroke="#596273" strokeWidth="3" strokeDasharray="4 4" />
         <path d="M132 110 C166 89 207 91 240 114" fill="none" stroke="#596273" strokeWidth="3" strokeDasharray="4 4" />
         <TracedPath d="M127 119 C145 130 168 140 188 153" progress={atrialProgress} opacity={1 - ramp(fraction, 0.18, 0.28)} />
-        <TracedPath d="M132 110 C166 89 207 91 240 114" progress={ramp(atrialProgress, 0.18, 0.82)} opacity={1 - ramp(fraction, 0.18, 0.28)} />
+        <TracedPath d="M132 110 C166 89 207 91 240 114" progress={bachmannProgress} opacity={1 - ramp(fraction, 0.18, 0.28)} />
 
         <circle cx="190" cy="158" r={6 + 4 * avPulse} fill={avPulse > 0 ? '#f59e0b' : '#8b5e34'} stroke="#ffd38a" strokeWidth="1.5" opacity={0.75 + 0.25 * avPulse} />
         <path d="M190 164 C191 179 194 190 197 204" fill="none" stroke="#596273" strokeWidth="4" strokeLinecap="round" />
@@ -142,26 +180,36 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
           <TracedPath d="M252 337 C272 319 280 299 283 278 M252 337 C272 348 280 359 283 372 M252 337 C232 350 220 363 211 378" progress={purkinjeProgress} width={3.5} opacity={1 - ramp(fraction, 0.49, 0.60)} />
         </g>
 
-        {/* Multiple curved fronts replace the former horizontal ventricular wipe. */}
+        {/* Directional ventricular activation. The small septal front begins
+            nearly with the apical endocardial fronts. Broad curved trails
+            then spread through the walls and generally upward toward the
+            base. This preserves the important sequence without presenting
+            four simultaneous, isotropically expanding point sources. */}
         <g clipPath="url(#teaching-ventricle-clip)">
-          <circle cx="123" cy="333" r={ventricularRadius} fill="#e96b50" opacity={0.84 * ventricularDepolarized} />
-          <circle cx="211" cy="350" r={ventricularRadius * 0.95} fill="#e96b50" opacity={0.84 * ventricularDepolarized} />
-          <circle cx="278" cy="309" r={ventricularRadius * 0.82} fill="#e96b50" opacity={0.84 * ventricularDepolarized} />
-          <circle cx="181" cy="276" r={ventricularRadius * 0.72} fill="#e96b50" opacity={0.84 * ventricularDepolarized} />
-
-          {[{ x: 123, y: 333, s: 1 }, { x: 211, y: 350, s: 0.95 }, { x: 278, y: 309, s: 0.82 }, { x: 181, y: 276, s: 0.72 }].map(origin => (
-            <circle
-              key={`${origin.x}-${origin.y}`}
-              cx={origin.x}
-              cy={origin.y}
-              r={ventricularRadius * origin.s}
-              fill="none"
-              stroke="#fde047"
-              strokeWidth="7"
-              opacity={ventricularProgress > 0 && ventricularProgress < 1 ? 0.88 : 0}
-              filter="url(#teaching-soft-glow)"
-            />
-          ))}
+          <DirectionalActivationPath
+            d="M207 237 C195 235 183 238 169 247"
+            progress={septalProgress}
+            trailWidth={28}
+            opacity={0.78 * ventricularDepolarized}
+          />
+          <DirectionalActivationPath
+            d="M123 365 C103 344 91 309 96 274 C99 245 111 220 132 203"
+            progress={rightVentricleProgress}
+            trailWidth={58}
+            opacity={0.78 * ventricularDepolarized}
+          />
+          <DirectionalActivationPath
+            d="M211 378 C243 369 271 347 286 314 C300 281 293 237 260 198"
+            progress={leftVentricleProgress}
+            trailWidth={66}
+            opacity={0.82 * ventricularDepolarized}
+          />
+          <DirectionalActivationPath
+            d="M188 368 C177 337 175 302 181 270 C185 245 192 221 204 201"
+            progress={apicalSeptalProgress}
+            trailWidth={34}
+            opacity={0.76 * ventricularDepolarized}
+          />
 
           {/* Soft, offset recovery patches intentionally avoid a single precise front. */}
           <circle cx="104" cy="245" r={25 + 105 * ventricularRecovery} fill="none" stroke="#38bdf8" strokeWidth="34" opacity={0.45 * ventricularRecovery} />
