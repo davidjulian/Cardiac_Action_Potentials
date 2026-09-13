@@ -21,12 +21,12 @@ const ANATOMY = {
   base: {
     name: 'Ventricular base',
     definition: 'The broad upper region of the ventricles, near the atria and atrioventricular valves. Here, “base” does not mean the bottom.',
-    orientation: 'In Module 1C, “toward the base” means toward the atrial end of the ventricles. The dashed guide marks an approximate level, not a precise anatomical plane.',
+    orientation: '“Toward the base” means toward the atrial end of the ventricles. The dashed guide marks an approximate level, not a precise anatomical plane.',
   },
   apex: {
     name: 'Apex',
     definition: 'The pointed lower tip of the heart, formed by the left ventricle.',
-    orientation: 'In Module 1C, “toward the apex” means toward the pointed tip. The dashed guide marks its approximate level in this schematic.',
+    orientation: '“Toward the apex” means toward the pointed tip. The dashed guide marks its approximate level in this schematic.',
   },
   sa: {
     name: 'SA Node (Sinoatrial Node)',
