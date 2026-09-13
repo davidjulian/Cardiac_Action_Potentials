@@ -124,7 +124,7 @@ export default function TeachingAnatomyDiagram({ active, onSelect, onHover }) {
           <text x="156" y="273" transform="rotate(-82 156 273)">R bundle</text>
           <text x="229" y="267" transform="rotate(66 229 267)">L bundle</text>
           <text x="214" y="370">Purkinje</text>
-          <text x="204" y="304" transform="rotate(86 204 304)">Septum</text>
+          <text x="178" y="300" transform="rotate(80 178 300)">Septum</text>
         </g>
 
         <TransverseVentricularInset active={active} prefix="Anatomy diagram" />
