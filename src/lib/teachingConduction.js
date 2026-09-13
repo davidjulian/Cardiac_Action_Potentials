@@ -53,7 +53,7 @@ export const TEACHING_CONDUCTION_STAGES = [
     end: 0.90,
     label: 'Ventricular repolarization',
     structures: 'Ventricular myocardium',
-    note: 'Regions recover at different times because both activation time and local action potential duration determine when repolarization occurs.',
+    note: 'This simplified pattern shows recovery broadly from base toward apex. Regional AP duration differences allow later activated tissue to recover earlier.',
   },
   {
     id: 'rest',

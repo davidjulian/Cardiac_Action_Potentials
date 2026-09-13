@@ -63,8 +63,8 @@ function makeTissueMap() {
     { id: 'ra', outer: RIGHT_ATRIUM, inner: RIGHT_ATRIUM_CAVITY, start: .055, end: .18, recovery: .48, recoveryEnd: .625 },
     { id: 'la', outer: LEFT_ATRIUM, inner: LEFT_ATRIUM_CAVITY, start: .10, end: .21, recovery: .515, recoveryEnd: .66 },
     { id: 'rv', outer: RIGHT_VENTRICLE, inner: RIGHT_VENTRICLE_CAVITY, start: .50, end: .648, recovery: .68, recoveryEnd: .885 },
-    { id: 'lv', outer: LEFT_VENTRICLE, inner: LEFT_VENTRICLE_CAVITY, start: .50, end: .645, recovery: .66, recoveryEnd: .875 },
-    { id: 'septum', outer: SEPTUM, start: .49, end: .625, recovery: .715, recoveryEnd: .90 },
+    { id: 'lv', outer: LEFT_VENTRICLE, inner: LEFT_VENTRICLE_CAVITY, start: .50, end: .645, recovery: .66, recoveryEnd: .90 },
+    { id: 'septum', outer: SEPTUM, start: .49, end: .625, recovery: .715, recoveryEnd: .875 },
   ].map(region => ({ ...region, wall: new Path2D(region.outer), cavity: region.inner ? new Path2D(region.inner) : null }))
   const atrialRoutes = Object.fromEntries(Object.entries(ATRIAL_ROUTES).map(([key, routes]) => [key, routes.map(sampleRoute)]))
   const points = regions.map(() => [])
@@ -89,9 +89,14 @@ function makeTissueMap() {
           // Broad curved progression through the connected walls; early septal
           // activation is integrated, with no separate basal septal flash.
           activation = Math.hypot(.8 * (x - apexX), y - apexY)
-          // Smooth regional timing variation illustrates recovery independently
-          // of activation. It is not a universal apical-to-basal recovery map.
-          recovery = .45 * activation + 36 * Math.sin((y - 190) / 70) + .32 * Math.abs(x - apexX)
+          // A separate basal timing field makes recovery progress broadly
+          // toward the apex, not along the activation path. Curved contours
+          // and staggered chamber timing retain a schematic regional pattern.
+          // This illustrates the base-before-apex LV pattern reported by
+          // Sengupta et al. (2006), doi:10.1016/j.jacc.2005.08.073, in pigs;
+          // it is not a measured or universal human recovery map.
+          const baseX = region.id === 'rv' ? 125 : region.id === 'lv' ? 245 : 191
+          recovery = Math.hypot(.65 * (x - baseX), y - 180)
         }
         points[r].push({ offset: (py * WIDTH * SCALE + px) * 4, activation, recovery })
         break
