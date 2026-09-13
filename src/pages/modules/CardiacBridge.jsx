@@ -18,6 +18,16 @@ const DEFAULT_RHYTHM_PARAMS = {
 
 // ── Anatomy data ───────────────────────────────────────────────────────────
 const ANATOMY = {
+  base: {
+    name: 'Ventricular base',
+    definition: 'The broad upper region of the ventricles, near the atria and atrioventricular valves. Here, “base” does not mean the bottom.',
+    orientation: 'In Module 1C, “toward the base” means toward the atrial end of the ventricles. The dashed guide marks an approximate level, not a precise anatomical plane.',
+  },
+  apex: {
+    name: 'Apex',
+    definition: 'The pointed lower tip of the heart, formed by the left ventricle.',
+    orientation: 'In Module 1C, “toward the apex” means toward the pointed tip. The dashed guide marks its approximate level in this schematic.',
+  },
   sa: {
     name: 'SA Node (Sinoatrial Node)',
     apType: 'sa',
@@ -506,23 +516,26 @@ function AnatomyDiagram({ selected, onSelect }) {
       </div>
 
       {/* Info panel */}
-      <div className="flex-1 min-h-[262px] flex flex-col justify-start gap-4">
-        <section aria-labelledby="anatomy-orientation-title" className="rounded-xl border border-gray-600 bg-gray-900/80 p-4 text-sm leading-relaxed text-gray-100">
-          <h3 id="anatomy-orientation-title" className="mb-3 text-base font-semibold">Orientation: base and apex</h3>
-          <p><strong>Ventricular base:</strong> the broad upper region of the ventricles, near the atria and atrioventricular valves. Here, “base” does not mean the bottom.</p>
-          <p className="mt-2"><strong>Apex:</strong> the pointed lower tip of the heart, formed by the left ventricle.</p>
-          <p className="mt-3 border-t border-gray-600 pt-3">In Module 1C, “toward the base” means toward the atrial end of the ventricles; “toward the apex” means toward the pointed tip.</p>
-        </section>
+      <div className="flex-1 min-h-[262px] flex flex-col justify-start">
         {info ? (
           <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-4 h-full">
             <h3 className="text-sm font-semibold text-white mb-3">{info.name}</h3>
-            <InfoRow label="Primary function" value={info.fn} />
-            <InfoRow label="Electrical role" value={info.electrical} />
+            {info.definition ? (
+              <>
+                <InfoRow label="Location" value={info.definition} />
+                <InfoRow label="Directional reference" value={info.orientation} />
+              </>
+            ) : (
+              <>
+                <InfoRow label="Primary function" value={info.fn} />
+                <InfoRow label="Electrical role" value={info.electrical} />
+              </>
+            )}
           </div>
         ) : (
           <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 h-full flex flex-col justify-center text-center">
             <p className="text-gray-100 text-base font-semibold">Hover or click a structure</p>
-            <p className="text-gray-300 text-sm mt-2 leading-relaxed">SA Node · RA · LA · AV Node · Bundle of His · Bundle Branches · Purkinje · RV · LV · Septum</p>
+            <p className="text-gray-300 text-sm mt-2 leading-relaxed">SA Node · RA · LA · AV Node · Bundle of His · Bundle Branches · Purkinje · RV · LV · Septum · Ventricular base · Apex</p>
           </div>
         )}
       </div>

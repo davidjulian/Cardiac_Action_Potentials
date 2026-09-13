@@ -10,6 +10,8 @@ const STRUCTURE_LABELS = {
   rv: 'Right ventricle',
   lv: 'Left ventricle',
   septum: 'Interventricular septum',
+  base: 'Ventricular base',
+  apex: 'Apex',
 }
 
 export default function TeachingAnatomyDiagram({ active, onSelect, onHover }) {
@@ -127,15 +129,22 @@ export default function TeachingAnatomyDiagram({ active, onSelect, onHover }) {
           <text x="178" y="300" transform="rotate(80 178 300)">Septum</text>
         </g>
 
-        {/* Orientation landmarks remain visible without selecting a structure. */}
-        <g fill="#f3f4f6" stroke="#cbd5e1" fontFamily="system-ui, sans-serif" fontSize="13" fontWeight="700" pointerEvents="none">
-          <text x="12" y="239" stroke="none">Ventricular</text>
-          <text x="12" y="255" stroke="none">base</text>
-          <path d="M85 234 L109 215" fill="none" strokeWidth="1.5" />
-          <circle cx="109" cy="215" r="2.5" stroke="none" />
-          <text x="296" y="423" stroke="none">Apex</text>
-          <path d="M287 418 L252 410" fill="none" strokeWidth="1.5" />
-          <circle cx="252" cy="410" r="2.5" stroke="none" />
+        {/* Muted level guides are orientation references, not conduction paths
+            or precise anatomical planes. Only their side labels are interactive. */}
+        <g fill="none" stroke="#64748b" strokeWidth="1" strokeDasharray="2 6" pointerEvents="none">
+          <path d="M76 213 H332" />
+          <path d="M54 410 H332" />
+        </g>
+        <g fontFamily="system-ui, sans-serif" fontSize="12" fontWeight="600">
+          <g {...interactive('base')} aria-pressed={active === 'base'} fill={active === 'base' ? '#7dd3fc' : '#e5e7eb'}>
+            <rect x="2" y="186" width="72" height="36" rx="4" fill={active === 'base' ? '#163044' : 'transparent'} />
+            <text x="5" y="201" fontSize="11">Ventricular</text>
+            <text x="5" y="216">base</text>
+          </g>
+          <g {...interactive('apex')} aria-pressed={active === 'apex'} fill={active === 'apex' ? '#7dd3fc' : '#e5e7eb'}>
+            <rect x="2" y="393" width="48" height="30" rx="4" fill={active === 'apex' ? '#163044' : 'transparent'} />
+            <text x="5" y="414">Apex</text>
+          </g>
         </g>
 
         <TransverseVentricularInset active={active} prefix="Anatomy diagram" />
