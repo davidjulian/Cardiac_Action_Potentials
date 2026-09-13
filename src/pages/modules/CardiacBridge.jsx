@@ -506,7 +506,13 @@ function AnatomyDiagram({ selected, onSelect }) {
       </div>
 
       {/* Info panel */}
-      <div className="flex-1 min-h-[262px] flex flex-col justify-start">
+      <div className="flex-1 min-h-[262px] flex flex-col justify-start gap-4">
+        <section aria-labelledby="anatomy-orientation-title" className="rounded-xl border border-gray-600 bg-gray-900/80 p-4 text-sm leading-relaxed text-gray-100">
+          <h3 id="anatomy-orientation-title" className="mb-3 text-base font-semibold">Orientation: base and apex</h3>
+          <p><strong>Ventricular base:</strong> the broad upper region of the ventricles, near the atria and atrioventricular valves. Here, “base” does not mean the bottom.</p>
+          <p className="mt-2"><strong>Apex:</strong> the pointed lower tip of the heart, formed by the left ventricle.</p>
+          <p className="mt-3 border-t border-gray-600 pt-3">In Module 1C, “toward the base” means toward the atrial end of the ventricles; “toward the apex” means toward the pointed tip.</p>
+        </section>
         {info ? (
           <div className="rounded-xl border border-gray-700 bg-gray-900/80 p-4 h-full">
             <h3 className="text-sm font-semibold text-white mb-3">{info.name}</h3>

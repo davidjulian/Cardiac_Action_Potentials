@@ -127,6 +127,17 @@ export default function TeachingAnatomyDiagram({ active, onSelect, onHover }) {
           <text x="178" y="300" transform="rotate(80 178 300)">Septum</text>
         </g>
 
+        {/* Orientation landmarks remain visible without selecting a structure. */}
+        <g fill="#f3f4f6" stroke="#cbd5e1" fontFamily="system-ui, sans-serif" fontSize="13" fontWeight="700" pointerEvents="none">
+          <text x="12" y="239" stroke="none">Ventricular</text>
+          <text x="12" y="255" stroke="none">base</text>
+          <path d="M85 234 L109 215" fill="none" strokeWidth="1.5" />
+          <circle cx="109" cy="215" r="2.5" stroke="none" />
+          <text x="296" y="423" stroke="none">Apex</text>
+          <path d="M287 418 L252 410" fill="none" strokeWidth="1.5" />
+          <circle cx="252" cy="410" r="2.5" stroke="none" />
+        </g>
+
         <TransverseVentricularInset active={active} prefix="Anatomy diagram" />
       </svg>
       <div className="absolute right-2 top-2 rounded-md border border-gray-600 bg-gray-950/90 px-2 py-1 text-xs font-semibold text-gray-200">
