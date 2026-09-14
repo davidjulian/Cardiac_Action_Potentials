@@ -143,7 +143,7 @@ export default function App() {
     <ModuleTabsProvider>
       <div className="flex min-h-screen" style={{ backgroundColor: '#0a0e1a' }}>
         <LabSidebar onOpenAbout={() => setAboutOpen(true)} />
-        <main className="flex-1 min-w-0 overflow-y-auto">
+        <main className="flex-1 min-w-0">
           <CardiacBridge />
         </main>
         {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}

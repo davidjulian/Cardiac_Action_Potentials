@@ -1145,7 +1145,7 @@ function LabeledSlider({ label, value, onChange, min, max, step = 1, unit = '', 
     <div className="flex-1 min-w-[220px]">
       <div className="flex items-baseline justify-between mb-1">
         <span className="text-xs text-gray-300">{label}</span>
-        <span className="text-xs font-mono text-gray-400">{formatValue ? formatValue(value) : `${value}${unit}`}</span>
+        <span className="text-xs font-mono text-gray-200">{formatValue ? formatValue(value) : `${value}${unit}`}</span>
       </div>
       <input
         type="range" min={min} max={max} step={step} value={value}
@@ -1155,11 +1155,6 @@ function LabeledSlider({ label, value, onChange, min, max, step = 1, unit = '', 
       />
     </div>
   )
-}
-
-function kBarColor(k) {
-  if (k < 3.5 || k > 5.5) return k < 3.0 || k > 7.0 ? '#ef4444' : '#f59e0b'
-  return '#10b981'
 }
 
 const SPEEDS = [0.1, 1]
@@ -1223,6 +1218,17 @@ function LiveActionPotentials() {
   const [kMEqL, setKMEqL] = useState(4.0)
   const [caMgDl, setCaMgDl] = useState(9.5)
   const [speed, setSpeed] = useState(0.1)
+  const [experimentsOpen, setExperimentsOpen] = useState(false)
+  const toolbarRef = useRef(null)
+  const [toolbarHeight, setToolbarHeight] = useState(112)
+
+  useEffect(() => {
+    const toolbar = toolbarRef.current
+    const observer = new ResizeObserver(() => setToolbarHeight(toolbar.getBoundingClientRect().height))
+    observer.observe(toolbar)
+    setToolbarHeight(toolbar.getBoundingClientRect().height)
+    return () => observer.disconnect()
+  }, [])
 
   const phys = useMemo(
     () => computeAPPhysiology({ sympathetic, parasympathetic, kMEqL, caMgDl }),
@@ -1293,7 +1299,6 @@ function LiveActionPotentials() {
 
   const { clockRef, tMs, isPlaying, toggle, scrub } = useLocalClock(phys.cycleMs, null, speed)
 
-  const kPct = clamp((kMEqL - 2) / (9 - 2) * 100, 0, 100)
 
   const toggleTissue = (id) => {
     setSelectedTissues(current => {
@@ -1351,6 +1356,23 @@ function LiveActionPotentials() {
   }
   const visiblePanels = TRACE_OPTIONS.filter(option => selectedTissues.includes(option.id))
 
+
+  const experimentControls = (
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-1">
+      <LabeledSlider label="Sympathetic Tone" value={sympathetic} min={0} max={100} onChange={setSympathetic} unit="%" accent="accent-red-500" />
+      <LabeledSlider label="Parasympathetic Tone" value={parasympathetic} min={0} max={100} onChange={setParasympathetic} unit="%" accent="accent-blue-500" />
+      <LabeledSlider label="Extracellular [K⁺]" value={kMEqL} min={2.0} max={9.0} step={0.1} onChange={setKMEqL} formatValue={v => `${v.toFixed(1)} mEq/L`} accent="accent-orange-500" />
+      <LabeledSlider label="Extracellular [Ca²⁺]" value={caMgDl} min={5.0} max={15.0} step={0.1} onChange={setCaMgDl} formatValue={v => `${v.toFixed(1)} mg/dL`} accent="accent-teal-500" />
+      <button type="button" onClick={() => {
+        setSympathetic(20)
+        setParasympathetic(20)
+        setKMEqL(4.0)
+        setCaMgDl(9.5)
+      }} className="justify-self-start rounded-lg border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-100 hover:bg-gray-700">
+        Reset physiology
+      </button>
+    </div>
+  )
   return (
     <div>
       <div className="mb-2 flex flex-wrap gap-2" role="tablist" aria-label="Action potential learning stages">
@@ -1382,12 +1404,36 @@ function LiveActionPotentials() {
         </button>
       </div>
 
-      <div className="mb-2 rounded-xl border border-gray-800 bg-gray-900/60 p-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold text-gray-100">Choose traces to display</h3>
-          <p className="text-xs text-gray-300">Choose one for close study or several to compare.</p>
+
+      <p className="mb-2 text-xs leading-relaxed text-gray-300">
+        Choose one trace for close study or several to compare. Use Study rate for observation and Real time for the physiological pace.
+      </p>
+      <div ref={toolbarRef} className="ap-toolbar sticky top-0 z-30 mb-3 rounded-xl border border-emerald-800 bg-gray-900 p-3 shadow-lg" aria-label="Action potential controls">
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={toggle} className="rounded-lg border border-emerald-700 bg-emerald-950 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-900">
+            {isPlaying ? 'Pause' : 'Play'}
+          </button>
+          <label className="flex min-w-0 items-center gap-2 text-xs text-gray-200">
+            <span>Time</span>
+            <input type="range" min={0} max={phys.cycleMs}
+              value={Math.min(Math.max(tMs, 0), phys.cycleMs)}
+              onChange={e => scrub(Number(e.target.value))}
+              aria-label="Cardiac cycle position"
+              className="w-[250px] max-w-[38vw] accent-emerald-500" />
+          </label>
+          <span className="w-28 text-xs font-mono text-gray-100 tabular-nums">{Math.round(tMs)} / {Math.round(phys.cycleMs)} ms</span>
+          <div className="flex flex-wrap gap-1" aria-label="Animation rate">
+            {SPEEDS.map(s => (
+              <button key={s} type="button" onClick={() => setSpeed(s)} aria-pressed={speed === s}
+                aria-label={`Set animation to ${playbackRateLabel(s)}`}
+                className={`rounded-lg border px-2 py-2 text-xs font-medium ${speed === s ? 'border-emerald-600 bg-emerald-950 text-white' : 'border-gray-600 bg-gray-800 text-gray-200'}`}>
+                {playbackRateLabel(s)}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="mt-2 flex flex-wrap gap-2" aria-label="Action potential trace selectors">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-gray-700 pt-2" aria-label="Action potential trace selectors">
+          <span className="mr-1 text-xs font-semibold text-gray-200">Traces</span>
           {TRACE_OPTIONS.map(option => {
             const selected = selectedTissues.includes(option.id)
             return (
@@ -1396,7 +1442,7 @@ function LiveActionPotentials() {
                 type="button"
                 aria-pressed={selected}
                 onClick={() => toggleTissue(option.id)}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors ${
                   selected
                     ? 'border-emerald-600 bg-emerald-950/60 text-white'
                     : 'border-gray-600 bg-gray-950/50 text-gray-300 hover:border-gray-400 hover:text-white'
@@ -1409,11 +1455,17 @@ function LiveActionPotentials() {
             )
           })}
         </div>
-        <p className="mt-2 text-xs leading-relaxed text-gray-300">
-          Start with the SA node and ventricular myocyte to compare slow and fast response action potentials. The last selected trace cannot be removed.
-        </p>
+        {lessonView === 'experiment' && (
+          <div className="mt-2 border-t border-gray-700 pt-2 xl:hidden">
+            <button type="button" aria-expanded={experimentsOpen} aria-controls="ap-mobile-experiments"
+              onClick={() => setExperimentsOpen(value => !value)}
+              className="rounded-lg border border-gray-600 px-3 py-1.5 text-sm text-gray-100">
+              {experimentsOpen ? 'Hide experiment controls' : 'Show experiment controls'}
+            </button>
+            {experimentsOpen && <div id="ap-mobile-experiments" className="mt-3 max-h-[35dvh] overflow-y-auto pr-2">{experimentControls}</div>}
+          </div>
+        )}
       </div>
-
       <ConductionPathway selectedTissues={selectedTissues} />
       <p className="text-xs text-gray-300 mb-2 leading-relaxed">
         The AV node depolarizes after atrial myocardium. The displayed AV delay represents slow conduction through
@@ -1421,65 +1473,8 @@ function LiveActionPotentials() {
         excitation to ventricular myocytes.
       </p>
 
-      {/* Playback controls stay above the tracings so students can watch the
-          cursor, phase description, and ion channel indicators while they
-          pause or scrub. The default study rate slows physiological time
-          enough for students to observe the changing signals. */}
-      <div className="mb-3 rounded-xl border border-emerald-800/60 bg-gray-900/80 px-4 py-3">
-        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold text-white">Playback and cardiac cycle position</h3>
-          <p className="text-xs text-gray-300">Use Study rate for observation; use Real time to appreciate the physiological pace.</p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={toggle}
-            className="px-4 py-2 rounded-lg text-sm font-semibold border border-emerald-700 bg-emerald-950/60 hover:bg-emerald-900/60 text-white transition-colors"
-          >
-            {isPlaying ? 'Pause' : 'Play'}
-          </button>
-          <input
-            type="range"
-            min={0} max={phys.cycleMs}
-            value={Math.min(Math.max(tMs, 0), phys.cycleMs)}
-            onChange={e => scrub(Number(e.target.value))}
-            aria-label="Cardiac cycle position"
-            className="flex-1 min-w-[180px] accent-emerald-500"
-          />
-          <span className="text-xs font-mono font-medium text-gray-200 tabular-nums w-28">{Math.round(tMs)} / {Math.round(phys.cycleMs)} ms</span>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-gray-200">Animation rate</span>
-          {SPEEDS.map(s => (
-            <button
-              key={s}
-              onClick={() => setSpeed(s)}
-              aria-pressed={speed === s}
-              aria-label={`Set animation to ${playbackRateLabel(s)}`}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                speed === s
-                  ? 'bg-emerald-950/60 text-emerald-200 border-emerald-600'
-                  : 'bg-gray-800 text-gray-200 border-gray-600 hover:border-gray-400 hover:text-white'
-              }`}
-            >
-              {playbackRateLabel(s)}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => {
-              setSympathetic(20)
-              setParasympathetic(20)
-              setKMEqL(4.0)
-              setCaMgDl(9.5)
-            }}
-            className="ml-auto px-3 py-1.5 rounded-lg text-xs border border-gray-600 bg-gray-800 text-gray-200 hover:text-white hover:bg-gray-700 transition-colors"
-          >
-            Reset physiology
-          </button>
-        </div>
-      </div>
 
-      <div className={lessonView === 'experiment' ? 'xl:grid xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-3' : ''}>
+      <div className={lessonView === 'experiment' ? 'xl:grid xl:grid-cols-[minmax(0,1fr)_280px] xl:gap-3' : ''}>
         <div className="min-w-0">
           <div className={`grid grid-cols-1 gap-2 items-stretch ${
             visiblePanels.length > 1
@@ -1499,26 +1494,22 @@ function LiveActionPotentials() {
               />
             ))}
           </div>
+
           <IonChannelGlossary />
         </div>
-
-        <div className={lessonView === 'experiment' ? 'xl:sticky xl:top-3 xl:self-start' : ''}>
-
+        {lessonView === 'experiment' && (
+          <aside aria-label="Experiment controls" className="ap-experiment-panel hidden self-start rounded-xl border border-gray-700 bg-gray-900 p-3 xl:sticky xl:block"
+            style={{ top: toolbarHeight + 12, maxHeight: `calc(100dvh - ${toolbarHeight + 24}px)`, overflowY: 'auto' }}>
+            <h3 className="mb-3 text-sm font-semibold text-white">Experiment controls</h3>
+            {experimentControls}
+          </aside>
+        )}
+      </div>
       {lessonView === 'experiment' && (
-        <>
+        <div className="mt-3 grid gap-3 lg:grid-cols-2" aria-label="Experiment explanations">
       {/* ── ANS controls ── */}
       <div className="mt-2 rounded-xl border border-gray-800 bg-gray-900/60 p-3">
         <h3 className="text-sm font-semibold text-white mb-1.5">Autonomic Nervous System</h3>
-        <div className="flex flex-col gap-3">
-          <LabeledSlider
-            label="Sympathetic Tone" value={sympathetic} min={0} max={100}
-            onChange={setSympathetic} unit="%" accent="accent-red-500"
-          />
-          <LabeledSlider
-            label="Parasympathetic Tone" value={parasympathetic} min={0} max={100}
-            onChange={setParasympathetic} unit="%" accent="accent-blue-500"
-          />
-        </div>
         <div className="grid grid-cols-1 gap-2 mt-2">
           <Callout>
             <strong>Sympathetic (β1 adrenergic):</strong> Noradrenaline / adrenaline → β1 receptor → ↑ I_f, ↑ I_Ca,L.
@@ -1547,25 +1538,6 @@ function LiveActionPotentials() {
       {/* ── Ion concentration controls ── */}
       <div className="mt-2 rounded-xl border border-gray-800 bg-gray-900/60 p-3">
         <h3 className="text-sm font-semibold text-white mb-1.5">Extracellular Ion Concentrations</h3>
-        <div className="flex flex-col gap-3">
-          <div className="flex-1 min-w-[220px]">
-            <LabeledSlider
-              label="Extracellular [K⁺]" value={kMEqL} min={2.0} max={9.0} step={0.1}
-              onChange={setKMEqL} unit=" mEq/L" accent="accent-orange-500"
-              formatValue={v => `${v.toFixed(1)} mEq/L`}
-            />
-            <div className="h-1.5 rounded-full bg-gray-800 mt-1 overflow-hidden">
-              <div className="h-full transition-all" style={{ width: `${kPct}%`, backgroundColor: kBarColor(kMEqL) }} />
-            </div>
-            <p className="text-xs font-medium text-gray-300 mt-1">Normal range 3.5–5.0 mEq/L</p>
-          </div>
-          <LabeledSlider
-            label="Extracellular [Ca²⁺]" value={caMgDl} min={5.0} max={15.0} step={0.1}
-            onChange={setCaMgDl} unit=" mg/dL" accent="accent-teal-500"
-            formatValue={v => `${v.toFixed(1)} mg/dL`}
-          />
-        </div>
-
         <div className="grid grid-cols-1 gap-2 mt-2">
           {kMEqL > 5.5 ? (
             <Callout>
@@ -1603,10 +1575,9 @@ function LiveActionPotentials() {
           </div>
         )}
       </div>
-        </>
-      )}
+
         </div>
-      </div>
+      )}
 
       {/* Intracellular and mechanical teaching signals only */}
       <p className="mt-2 text-xs font-medium text-gray-300 text-center leading-relaxed">
