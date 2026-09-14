@@ -1,4 +1,7 @@
 const STRUCTURE_LABELS = {
+  bachmann: "Bachmann’s bundle",
+  atrialSeptum: 'Atrial septal region',
+  avInsulation: 'Atrioventricular insulation',
   ra: 'Right atrium',
   la: 'Left atrium',
   sa: 'Sinoatrial node',
@@ -66,10 +69,13 @@ export default function TeachingAnatomyDiagram({ active, onSelect, onHover }) {
         <path d="M111 101 L111 47" fill="none" stroke="#8f585b" strokeWidth="15" strokeLinecap="round" />
         <path d="M110 196 L99 233" fill="none" stroke="#8f585b" strokeWidth="15" strokeLinecap="round" />
 
-        <path d={RIGHT_ATRIUM} {...tissueStyle('ra', '#4b292b')} {...interactive('ra')} />
-        <path d={LEFT_ATRIUM} {...tissueStyle('la', '#4b292b')} {...interactive('la')} />
         <path d={RIGHT_VENTRICLE} {...tissueStyle('rv', '#4b292b')} {...interactive('rv')} />
         <path d={LEFT_VENTRICLE} {...tissueStyle('lv', '#5b3032')} {...interactive('lv')} />
+        <path d={ATRIAL_MYOCARDIUM} fill="#4b292b" stroke="#b66f68" strokeWidth="2" />
+        <path d={RIGHT_ATRIUM} fill={active === 'ra' ? '#166534' : 'transparent'} {...interactive('ra')} />
+        <path d={LEFT_ATRIUM} fill={active === 'la' ? '#166534' : 'transparent'} {...interactive('la')} />
+        <path d={ATRIAL_SEPTUM} fill={active === 'atrialSeptum' ? '#166534' : 'transparent'} {...interactive('atrialSeptum')} />
+        <path d={BACHMANN_BUNDLE} {...tissueStyle('bachmann', '#89504c')} {...interactive('bachmann')} />
 
         {/* All chambers use the same cutaway convention. Wall thickness is
             exaggerated so structures and wavefronts remain legible. */}
@@ -80,22 +86,21 @@ export default function TeachingAnatomyDiagram({ active, onSelect, onHover }) {
 
         <path d={SEPTUM} fill={active === 'septum' ? '#075985' : '#293444'} stroke={active === 'septum' ? '#7dd3fc' : '#8491a3'} strokeWidth={active === 'septum' ? 4 : 2} {...interactive('septum')} />
 
-        <path d="M127 119 C145 130 168 140 188 153" fill="none" stroke="#aab4c3" strokeWidth="3" strokeDasharray="5 5" pointerEvents="none" />
-        <path d="M132 110 C166 89 207 91 240 114" fill="none" stroke="#aab4c3" strokeWidth="3" strokeDasharray="5 5" pointerEvents="none" />
+        <path d={AV_BOUNDARY} fill="none" stroke={active === 'avInsulation' ? '#86efac' : '#cbd5e1'} strokeWidth="7" {...interactive('avInsulation')} />
 
         <g {...interactive('sa')}>
-          <circle cx="121" cy="113" r="15" fill="transparent" />
-          <circle cx="121" cy="113" r="8" fill={active === 'sa' ? '#fde047' : '#b9973f'} stroke={active === 'sa' ? '#fff7ae' : '#f5d97a'} strokeWidth={active === 'sa' ? 4 : 2} filter={active === 'sa' ? 'url(#anatomy-glow)' : 'none'} />
+          <circle cx={SA_NODE.x} cy={SA_NODE.y} r="15" fill="transparent" />
+          <circle cx={SA_NODE.x} cy={SA_NODE.y} r="8" fill={active === 'sa' ? '#fde047' : '#b9973f'} stroke={active === 'sa' ? '#fff7ae' : '#f5d97a'} strokeWidth={active === 'sa' ? 4 : 2} filter={active === 'sa' ? 'url(#anatomy-glow)' : 'none'} />
         </g>
 
         <g {...interactive('av')}>
-          <circle cx="190" cy="158" r="15" fill="transparent" />
-          <circle cx="190" cy="158" r="8" fill={active === 'av' ? '#fde047' : '#ad7135'} stroke={active === 'av' ? '#fff7ae' : '#ffd38a'} strokeWidth={active === 'av' ? 4 : 2} filter={active === 'av' ? 'url(#anatomy-glow)' : 'none'} />
+          <circle cx={AV_NODE.x} cy={AV_NODE.y} r="15" fill="transparent" />
+          <circle cx={AV_NODE.x} cy={AV_NODE.y} r="8" fill={active === 'av' ? '#fde047' : '#ad7135'} stroke={active === 'av' ? '#fff7ae' : '#ffd38a'} strokeWidth={active === 'av' ? 4 : 2} filter={active === 'av' ? 'url(#anatomy-glow)' : 'none'} />
         </g>
 
         <g {...interactive('his')}>
-          <path d="M190 164 C191 179 194 190 197 204" fill="none" strokeLinecap="round" {...pathwayStyle('his')} />
-          <path d="M190 160 C191 179 194 194 199 208" fill="none" stroke="transparent" strokeWidth="18" />
+          <path d={HIS_PATH} fill="none" strokeLinecap="round" {...pathwayStyle('his')} />
+          <path d={HIS_PATH} fill="none" stroke="transparent" strokeWidth="18" />
         </g>
 
         <g {...interactive('rbundle')}>
@@ -119,7 +124,7 @@ export default function TeachingAnatomyDiagram({ active, onSelect, onHover }) {
           <text x="74" y="82">SA node</text>
           <text x="108" y="164">RA</text>
           <text x="255" y="158">LA</text>
-          <text x="149" y="151">AV node</text>
+          <text x="151" y="148">AV node</text>
           <text x="205" y="195">His</text>
           <text x="105" y="384">RV</text>
           <text x="281" y="402">LV</text>
@@ -157,8 +162,8 @@ export default function TeachingAnatomyDiagram({ active, onSelect, onHover }) {
 }
 import {
   HEART_VIEW_BOX,
-  RIGHT_ATRIUM,
-  LEFT_ATRIUM,
+  ATRIAL_MYOCARDIUM, ATRIAL_SEPTUM, BACHMANN_BUNDLE, AV_BOUNDARY, SA_NODE, AV_NODE, HIS_PATH,
+  RIGHT_ATRIUM, LEFT_ATRIUM,
   RIGHT_ATRIUM_CAVITY,
   LEFT_ATRIUM_CAVITY,
   RIGHT_VENTRICLE,

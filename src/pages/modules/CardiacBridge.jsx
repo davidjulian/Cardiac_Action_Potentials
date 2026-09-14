@@ -18,6 +18,21 @@ const DEFAULT_RHYTHM_PARAMS = {
 
 // ── Anatomy data ───────────────────────────────────────────────────────────
 const ANATOMY = {
+  bachmann: {
+    name: 'Bachmann’s bundle',
+    fn: 'A broad band of atrial muscle that provides a major route for excitation from the right atrium to the left atrium.',
+    electrical: 'A preferential muscular route, not an insulated wire or the only interatrial connection. Excitation also spreads through other connected atrial muscle. The band is emphasized here so it can be selected.',
+  },
+  atrialSeptum: {
+    name: 'Atrial septal region',
+    fn: 'Tissue between the separate right and left atrial blood cavities. The AV node lies in the lower right atrial septal region.',
+    electrical: 'Atrial muscle conducts excitation from cell to cell through gap junctions. This simplified connected wall represents septal and nearby interatrial muscle, not a precise map of individual pathways.',
+  },
+  avInsulation: {
+    name: 'Atrioventricular insulation',
+    fn: 'The pale boundary represents fibrous tissue that electrically separates atrial and ventricular working myocardium.',
+    electrical: 'Normal excitation reaches the ventricles through the AV node and penetrating His bundle, not by spreading directly across this boundary. Its continuous line is a teaching simplification, not a literal anatomical section.',
+  },
   base: {
     name: 'Ventricular base',
     definition: 'The broad upper region of the ventricles, near the atria and atrioventricular valves. Here, “base” does not mean the bottom.',
@@ -39,20 +54,20 @@ const ANATOMY = {
     name: 'Right Atrium',
     apType: 'myocyte',
     fn: 'Receives deoxygenated blood from the superior and inferior vena cava and coronary sinus. Contracts to complete ventricular filling (atrial kick).',
-    electrical: 'Fast-response myocyte with prominent Phase 0 I_Na upstroke. Conduction from SA node spreads at ~1 m/s. Refractory period shorter than ventricles, enabling rapid atrial rhythms.',
+    electrical: 'Fast-response myocytes with a prominent Phase 0 I_Na upstroke. Excitation spreads from the SA node through connected atrial muscle via gap junctions, including toward the AV node. Preferential routes do not restrict excitation to a few discrete wires.',
     ECG: 'Initial (first half) of the P wave. Right atrial enlargement prolongs or widens the early P wave. Depolarizes slightly before left atrium.',
   },
   la: {
     name: 'Left Atrium',
     apType: 'myocyte',
     fn: 'Receives oxygenated blood from four pulmonary veins. Contracts to complete left ventricular filling. Forms the posterior heart border on chest X-ray.',
-    electrical: "Connected to RA via Bachmann's bundle (interatrial conduction pathway). Conduction velocity ~1 m/s. Activates slightly later than RA due to path length.",
+    electrical: 'Excitation reaches the left atrium through muscular connections with the right atrium. Bachmann’s bundle is a major route, but not the only one. Activation of the two atria overlaps in time.',
     ECG: "Terminal (second half) of the P wave. Left atrial enlargement produces a bifid P wave (P mitrale) in lead II or negative terminal deflection in V1.",
   },
   av: {
     name: 'AV Node (Atrioventricular Node)',
     apType: 'sa',
-    fn: 'The only normal electrical bridge between atria and ventricles (AV annulus is otherwise electrically insulating). Imposes a 120–200 ms delay — critical for allowing ventricular filling before systole.',
+    fn: 'Located in the lower right atrial septal region, where it receives excitation from atrial muscle. Slow conduction delays ventricular activation, allowing time for ventricular filling. The AV conduction axis continues into the His bundle, which crosses the fibrous insulation.',
     electrical: 'Slow-response cells like SA node: upstroke via I_Ca,L, no fast I_Na. Conduction velocity only 0.05 m/s — the slowest in the heart. Heavily innervated by both vagal (slows) and sympathetic (accelerates) fibers. Site of most Wenckebach and complete heart block.',
     ECG: 'Responsible for the PR interval. AV nodal delay = isoelectric PR segment. First-degree block = PR > 200 ms. Third-degree block = complete dissociation of P waves and QRS complexes.',
   },
@@ -535,7 +550,7 @@ function AnatomyDiagram({ selected, onSelect }) {
         ) : (
           <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4 h-full flex flex-col justify-center text-center">
             <p className="text-gray-100 text-base font-semibold">Hover or click a structure</p>
-            <p className="text-gray-300 text-sm mt-2 leading-relaxed">SA Node · RA · LA · AV Node · Bundle of His · Bundle Branches · Purkinje · RV · LV · Septum · Ventricular base · Apex</p>
+            <p className="text-gray-300 text-sm mt-2 leading-relaxed">SA Node · RA · LA · Bachmann’s bundle · Atrial septal region · AV Node · AV insulation · Bundle of His · Bundle Branches · Purkinje · RV · LV · Ventricular septum · Ventricular base · Apex</p>
           </div>
         )}
       </div>

@@ -39,11 +39,6 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
   const fraction = rawFraction - Math.floor(rawFraction)
 
   const saPulse = bell(fraction, 0, 0.075)
-  const atrialProgress = ramp(fraction, 0.055, 0.18)
-  // The schematic pathway must reach the left atrium before the left atrial
-  // fill begins. This changes only the drawn travel rate, not the established
-  // timing of right and left atrial myocardial activation.
-  const bachmannProgress = ramp(atrialProgress, 0.05, 0.35)
   const avPulse = bell(fraction, 0.18, 0.34)
   const hisProgress = ramp(fraction, 0.34, 0.40)
   // Show the specialized pathway in anatomical sequence. The bundle branch
@@ -71,10 +66,11 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
         <path d="M110 196 L99 233" fill="none" stroke="#6f4547" strokeWidth="15" strokeLinecap="round" />
 
         {/* Resting myocardium. */}
-        <path d={RIGHT_ATRIUM} fill="#4b292b" stroke="#a56661" strokeWidth="2" />
-        <path d={LEFT_ATRIUM} fill="#4b292b" stroke="#a56661" strokeWidth="2" />
         <path d={RIGHT_VENTRICLE} fill="#4b292b" stroke="#a56661" strokeWidth="2" />
         <path d={LEFT_VENTRICLE} fill="#5b3032" stroke="#a56661" strokeWidth="2" />
+
+        <path d={ATRIAL_MYOCARDIUM} fill="#4b292b" stroke="#a56661" strokeWidth="2" />
+        <path d={BACHMANN_BUNDLE} fill="#4b292b" stroke="#a56661" strokeWidth="2" />
 
         {/* All four chambers use a cutaway convention. The walls are
             intentionally exaggerated for visibility. */}
@@ -85,25 +81,21 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
         <path d={SEPTUM} fill="#293444" stroke="#8491a3" strokeWidth="1.5" />
 
         <MyocardialStateLayer fraction={fraction} />
+        <path d={AV_BOUNDARY} fill="none" stroke="#cbd5e1" strokeWidth="7" />
 
         {/* Nodes and named conduction pathways. */}
         <circle
-          cx="121"
-          cy="113"
+          cx={SA_NODE.x}
+          cy={SA_NODE.y}
           r={7 + 5 * saPulse}
           fill={saPulse > 0 ? '#fde047' : '#7c6941'}
           stroke={saPulse > 0 ? '#fff7ae' : '#a78b52'}
           strokeWidth="2"
           filter={saPulse > 0 ? 'url(#teaching-soft-glow)' : 'none'}
         />
-        <path d="M127 119 C145 130 168 140 188 153" fill="none" stroke="#596273" strokeWidth="3" strokeDasharray="4 4" />
-        <path d="M132 110 C166 89 207 91 240 114" fill="none" stroke="#596273" strokeWidth="3" strokeDasharray="4 4" />
-        <TracedPath d="M127 119 C145 130 168 140 188 153" progress={atrialProgress} opacity={1 - ramp(fraction, 0.18, 0.28)} />
-        <TracedPath d="M132 110 C166 89 207 91 240 114" progress={bachmannProgress} opacity={1 - ramp(fraction, 0.18, 0.28)} />
-
-        <circle cx="190" cy="158" r={6 + 4 * avPulse} fill={avPulse > 0 ? '#f59e0b' : '#8b5e34'} stroke="#ffd38a" strokeWidth="1.5" opacity={0.75 + 0.25 * avPulse} />
-        <path d="M190 164 C191 179 194 190 197 204" fill="none" stroke="#596273" strokeWidth="4" strokeLinecap="round" />
-        <TracedPath d="M190 164 C191 179 194 190 197 204" progress={hisProgress} width={5} opacity={1 - ramp(fraction, 0.40, 0.47)} />
+        <circle cx={AV_NODE.x} cy={AV_NODE.y} r={6 + 4 * avPulse} fill={avPulse > 0 ? '#f59e0b' : '#8b5e34'} stroke="#ffd38a" strokeWidth="1.5" opacity={0.75 + 0.25 * avPulse} />
+        <path d={HIS_PATH} fill="none" stroke="#596273" strokeWidth="4" strokeLinecap="round" />
+        <TracedPath d={HIS_PATH} progress={hisProgress} width={5} opacity={1 - ramp(fraction, 0.40, 0.47)} />
 
         <path d="M197 204 C188 235 174 273 158 325 M197 204 C215 236 235 276 252 337" fill="none" stroke="#596273" strokeWidth="3.5" strokeLinecap="round" />
         <TracedPath d="M197 204 C188 235 174 273 158 325" progress={bundleBranchProgress} width={5} opacity={1 - ramp(fraction, 0.49, 0.60)} />
@@ -126,7 +118,7 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
           <text x="77" y="82">SA node</text>
           <text x="108" y="164">RA</text>
           <text x="255" y="158">LA</text>
-          <text x="153" y="151">AV node</text>
+          <text x="151" y="148">AV node</text>
           <text x="205" y="195">His</text>
           <text x="105" y="384">RV</text>
           <text x="281" y="402">LV</text>
@@ -148,8 +140,7 @@ export default function TeachingConductionAnimation({ timeMs, cycleMs }) {
 }
 import {
   HEART_VIEW_BOX,
-  RIGHT_ATRIUM,
-  LEFT_ATRIUM,
+  ATRIAL_MYOCARDIUM, BACHMANN_BUNDLE, AV_BOUNDARY, SA_NODE, AV_NODE, HIS_PATH,
   RIGHT_ATRIUM_CAVITY,
   LEFT_ATRIUM_CAVITY,
   RIGHT_VENTRICLE,

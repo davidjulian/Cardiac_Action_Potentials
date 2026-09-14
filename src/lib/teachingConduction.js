@@ -13,7 +13,7 @@ export const TEACHING_CONDUCTION_STAGES = [
     end: 0.18,
     label: 'Atrial activation',
     structures: "Right atrium, Bachmann's bundle, and left atrium",
-    note: 'Excitation spreads through right atrial myocardium and crosses to the left atrium through Bachmann’s bundle.',
+    note: 'Excitation spreads through connected atrial muscle toward the AV node and left atrium. Bachmann’s bundle is a major interatrial route, not the only one.',
   },
   {
     id: 'av',
