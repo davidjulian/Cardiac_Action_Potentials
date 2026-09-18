@@ -26,7 +26,6 @@ function LabSidebar({ onOpenAbout }) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Laboratory sections">
-        <p className="px-2 mb-2 text-xs font-semibold uppercase tracking-widest text-gray-300">Explore</p>
         <div className="space-y-1">
           {tabInfo?.tabs.map(tab => {
             const active = tab.id === tabInfo.active
@@ -45,7 +44,7 @@ function LabSidebar({ onOpenAbout }) {
                 <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono ${
                   active ? 'bg-emerald-900/70 text-emerald-200' : 'bg-gray-800 text-gray-300'
                 }`}>
-                  {tab.id}
+                  {tab.number ?? tab.id}
                 </span>
                 <span className="flex-1 text-sm leading-tight">{tab.shortLabel || tab.label}</span>
                 {!active && visited && (

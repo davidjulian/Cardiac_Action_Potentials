@@ -2884,9 +2884,10 @@ function VectorCycle({ rhythm }) {
 }
 
 const MODULE1_TABS = [
-  { id: '1A', label: '1A · Cardiac Anatomy', shortLabel: 'Cardiac anatomy' },
-  { id: '1B', label: '1B · Action Potentials', shortLabel: 'Action potentials' },
-  { id: '1C', label: '1C · Conduction', shortLabel: 'Conduction' },
+  // Keep storage IDs stable so returning students retain their selected module.
+  { id: '1A', number: 1, label: '1 · Cardiac Anatomy', shortLabel: 'Cardiac anatomy' },
+  { id: '1B', number: 2, label: '2 · Action Potentials', shortLabel: 'Action potentials' },
+  { id: '1C', number: 3, label: '3 · Conduction', shortLabel: 'Conduction' },
 ]
 
 // ── Main export ────────────────────────────────────────────────────────────
@@ -2915,7 +2916,7 @@ export default function CardiacBridge() {
     >
       {active === '1A' && (
         <Section
-          label="1A"
+          label="1"
           title="Heart Anatomy Overview"
           subtitle="Hover or click any structure to see its primary function and electrical behavior."
         >
@@ -2930,7 +2931,7 @@ export default function CardiacBridge() {
 
       {active === '1B' && (
         <Section
-          label="1B"
+          label="2"
           title="Action Potentials by Cell Type"
           subtitle="Compare action potential shapes, follow their activation sequence, and use channel contributions to predict how each cell will respond."
         >
@@ -2946,7 +2947,7 @@ export default function CardiacBridge() {
 
       {active === '1C' && (
         <Section
-          label="1C"
+          label="3"
           title="Conduction Animation"
           subtitle="Follow a physiologically guided schematic of activation and recovery. Use the scrubber to examine each stage of the cardiac cycle."
         >
