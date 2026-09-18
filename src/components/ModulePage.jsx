@@ -1,10 +1,10 @@
-export default function ModulePage({ title, objective, description, wide = false, children }) {
+export default function ModulePage({ number, title, objective, description, wide = false, children }) {
   return (
     <div className={`min-h-screen mx-auto ${wide ? 'p-4 max-w-[1500px]' : 'p-5 max-w-4xl'}`}>
       <header className="mb-3">
         <div className="flex items-center gap-3">
           <span className="text-xs font-semibold uppercase tracking-widest px-2.5 py-0.5 rounded-full text-emerald-300 bg-emerald-950/60 border border-emerald-800/60">
-            Interactive physiology
+            {number != null ? `Module ${number}` : 'Interactive physiology'}
           </span>
           <h1 className="text-lg font-bold text-white">{title}</h1>
         </div>

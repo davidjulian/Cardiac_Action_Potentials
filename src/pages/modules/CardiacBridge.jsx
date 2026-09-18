@@ -2910,7 +2910,7 @@ export default function CardiacBridge() {
   return (
     <ModulePage
       moduleId="cardiac"
-      number={1}
+      number={MODULE1_TABS.find(tab => tab.id === active)?.number}
       title="Cardiac Action Potentials"
       wide={active === '1B'}
     >
