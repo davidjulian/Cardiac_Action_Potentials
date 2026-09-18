@@ -4,6 +4,7 @@ import ModulePage from '../../components/ModulePage'
 import TeachingConductionAnimation from '../../components/TeachingConductionAnimation'
 import TeachingAnatomyDiagram from '../../components/TeachingAnatomyDiagram'
 import { getTeachingConductionStage } from '../../lib/teachingConduction'
+import { comparisonTimeDomain } from '../../lib/comparisonTimeDomain'
 import HeartAnimation from '../../components/HeartAnimation'
 import { ECGVoltage, cycleVoltage, buildRhythmFromParams, meanQRSAxis } from '../../lib/ECGEngine'
 import { AxisSummaryPanel } from '../../components/MeanAxisPanel'
@@ -1025,6 +1026,7 @@ function PhaseLabel({ clockRef, cycleMs, phases }) {
 function APLivePanel({
   clockRef,
   cycleMs,
+  displayDomain,
   title,
   sub,
   data,
@@ -1039,7 +1041,7 @@ function APLivePanel({
   referenceOffsetMs = 0,
   referenceLabel,
 }) {
-  const xDomain = useMemo(() => [0, cycleMs], [cycleMs])
+  const xDomain = displayDomain
   const phaseMarkers = useMemo(
     () => phases.map(ph => {
       const col = AP_PHASE_COLORS[ph.id] || [100, 100, 100, 25]
@@ -1092,6 +1094,8 @@ function APLivePanel({
       <TraceCanvas
         clockRef={clockRef}
         valueAt={valueAt}
+        valueXMin={0}
+        valueXMax={cycleMs}
         xDomain={xDomain}
         yDomain={AP_Y_DOMAIN}
         color={color}
@@ -1119,6 +1123,8 @@ function APLivePanel({
           <TraceCanvas
             clockRef={clockRef}
             valueAt={calciumAt}
+            valueXMin={0}
+            valueXMax={cycleMs}
             xDomain={xDomain}
             yDomain={CALCIUM_Y_DOMAIN}
             color="#22d3ee"
@@ -1134,6 +1140,8 @@ function APLivePanel({
           <TraceCanvas
             clockRef={clockRef}
             valueAt={forceAt}
+            valueXMin={0}
+            valueXMax={cycleMs}
             xDomain={xDomain}
             yDomain={FORCE_Y_DOMAIN}
             color="#fb7185"
@@ -1370,6 +1378,7 @@ function LiveActionPotentials() {
     },
   }
   const visiblePanels = TRACE_OPTIONS.filter(option => selectedTissues.includes(option.id))
+  const displayDomain = comparisonTimeDomain(phys.cycleMs, Object.values(tracePanels))
 
 
   const experimentControls = (
@@ -1505,6 +1514,7 @@ function LiveActionPotentials() {
                 key={option.id}
                 clockRef={clockRef}
                 cycleMs={phys.cycleMs}
+                displayDomain={displayDomain}
                 {...tracePanels[option.id]}
               />
             ))}
@@ -1652,6 +1662,8 @@ function useLocalClock(cycleMs, nativeCycleMs = null, speed = 1) {
 function TraceCanvas({
   clockRef,
   valueAt,
+  valueXMin = null,
+  valueXMax = null,
   xDomain,
   yDomain,
   color,
@@ -1669,6 +1681,8 @@ function TraceCanvas({
   useEffect(() => {
     drawConfigRef.current = {
       valueAt,
+      valueXMin,
+      valueXMax,
       xDomain,
       yDomain,
       color,
@@ -1678,7 +1692,7 @@ function TraceCanvas({
       referenceXMin,
       referenceXMax,
     }
-  }, [valueAt, xDomain, yDomain, color, phaseMarkers, bandLabels, referenceValueAt, referenceXMin, referenceXMax])
+  }, [valueAt, valueXMin, valueXMax, xDomain, yDomain, color, phaseMarkers, bandLabels, referenceValueAt, referenceXMin, referenceXMax])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -1702,6 +1716,8 @@ function TraceCanvas({
     const frame = () => {
       const {
         valueAt: liveValueAt,
+        valueXMin: liveValueXMin,
+        valueXMax: liveValueXMax,
         xDomain: liveXDomain,
         yDomain: liveYDomain,
         color: liveColor,
@@ -1780,9 +1796,11 @@ function TraceCanvas({
       ctx.strokeStyle = liveColor
       ctx.lineWidth = 1.8
       ctx.beginPath()
-      const N = 220
+      const valueStart = Math.max(x0, liveValueXMin ?? x0)
+      const valueEnd = Math.min(x1, liveValueXMax ?? x1)
+      const N = Math.max(2, Math.round(220 * (valueEnd - valueStart) / (x1 - x0)))
       for (let i = 0; i <= N; i++) {
-        const t = x0 + (i / N) * (x1 - x0)
+        const t = valueStart + (i / N) * (valueEnd - valueStart)
         const v = Math.max(yMin, Math.min(yMax, liveValueAt(t)))
         const x = toX(t), y = toY(v)
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
