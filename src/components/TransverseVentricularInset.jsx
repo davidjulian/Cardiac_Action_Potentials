@@ -9,19 +9,19 @@ export default function TransverseVentricularInset({ active = null, prefix = 'he
 
       <ellipse
         cx="157" cy="34" rx="39" ry="30"
-        fill={lvActive ? '#166534' : '#5b3032'}
-        stroke={lvActive ? '#86efac' : '#b66f68'}
+        fill={lvActive ? '#166534' : '#543940'}
+        stroke={lvActive ? '#86efac' : '#b99299'}
         strokeWidth={lvActive ? 3 : 2}
       />
-      <ellipse cx="157" cy="34" rx="22" ry="16" fill="#111827" stroke="#96605d" strokeWidth="1.5" />
+      <ellipse cx="157" cy="34" rx="22" ry="16" fill="#101b2b" stroke="#a67b84" strokeWidth="1.5" />
 
       <path
         d="M119 10 C83 9 60 24 60 40 C60 57 84 70 120 61 C105 55 97 46 97 36 C97 25 105 16 119 10 Z"
-        fill={rvActive ? '#166534' : '#4b292b'}
-        stroke={rvActive ? '#86efac' : '#b66f68'}
+        fill={rvActive ? '#166534' : '#543940'}
+        stroke={rvActive ? '#86efac' : '#b99299'}
         strokeWidth={rvActive ? 3 : 2}
       />
-      <path d="M104 20 C83 20 70 28 70 39 C70 50 84 57 105 54 C95 45 94 31 104 20 Z" fill="#111827" stroke="#96605d" strokeWidth="1.5" />
+      <path d="M104 20 C83 20 70 28 70 39 C70 50 84 57 105 54 C95 45 94 31 104 20 Z" fill="#101b2b" stroke="#a67b84" strokeWidth="1.5" />
 
       <text x="79" y="43" textAnchor="middle" fill="#f3f4f6" fontSize="10" fontWeight="700">RV</text>
       <text x="157" y="38" textAnchor="middle" fill="#f3f4f6" fontSize="10" fontWeight="700">LV</text>

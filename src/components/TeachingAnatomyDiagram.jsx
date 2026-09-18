@@ -38,13 +38,13 @@ export default function TeachingAnatomyDiagram({ active, onSelect, onHover }) {
 
   const tissueStyle = (key, restingFill) => ({
     fill: active === key ? '#166534' : restingFill,
-    stroke: active === key ? '#86efac' : '#b66f68',
+    stroke: active === key ? '#86efac' : '#b99299',
     strokeWidth: active === key ? 4 : 2,
   })
 
   const pathwayStyle = key => ({
     stroke: active === key ? '#fde047' : '#aab4c3',
-    strokeWidth: active === key ? 7 : 4,
+    strokeWidth: active === key ? 5 : 3,
     filter: active === key ? 'url(#anatomy-glow)' : 'none',
   })
 
@@ -65,28 +65,25 @@ export default function TeachingAnatomyDiagram({ active, onSelect, onHover }) {
 
         <rect width="380" height="535" fill="#080d18" />
 
-        <path d="M250 92 C242 52 258 29 284 25 C310 22 325 44 322 70" fill="none" stroke="#9b514b" strokeWidth="20" strokeLinecap="round" />
-        <path d="M111 101 L111 47" fill="none" stroke="#8f585b" strokeWidth="15" strokeLinecap="round" />
-        <path d="M110 196 L99 233" fill="none" stroke="#8f585b" strokeWidth="15" strokeLinecap="round" />
 
-        <path d={RIGHT_VENTRICLE} {...tissueStyle('rv', '#4b292b')} {...interactive('rv')} />
-        <path d={LEFT_VENTRICLE} {...tissueStyle('lv', '#5b3032')} {...interactive('lv')} />
-        <path d={ATRIAL_MYOCARDIUM} fill="#4b292b" stroke="#b66f68" strokeWidth="2" />
+        <path d={RIGHT_VENTRICLE} {...tissueStyle('rv', '#543940')} {...interactive('rv')} />
+        <path d={LEFT_VENTRICLE} {...tissueStyle('lv', '#543940')} {...interactive('lv')} />
+        <path d={ATRIAL_MYOCARDIUM} fill="#543940" stroke="#b99299" strokeWidth="2" />
         <path d={RIGHT_ATRIUM} fill={active === 'ra' ? '#166534' : 'transparent'} {...interactive('ra')} />
         <path d={LEFT_ATRIUM} fill={active === 'la' ? '#166534' : 'transparent'} {...interactive('la')} />
         <path d={ATRIAL_SEPTUM} fill={active === 'atrialSeptum' ? '#166534' : 'transparent'} {...interactive('atrialSeptum')} />
-        <path d={BACHMANN_BUNDLE} {...tissueStyle('bachmann', '#89504c')} {...interactive('bachmann')} />
+        <path d={BACHMANN_BUNDLE} {...tissueStyle('bachmann', '#86626b')} {...interactive('bachmann')} />
 
         {/* All chambers use the same cutaway convention. Wall thickness is
             exaggerated so structures and wavefronts remain legible. */}
-        <path d={RIGHT_ATRIUM_CAVITY} fill="#161923" stroke="#96605d" strokeWidth="2" pointerEvents="none" />
-        <path d={LEFT_ATRIUM_CAVITY} fill="#161923" stroke="#96605d" strokeWidth="2" pointerEvents="none" />
-        <path d={RIGHT_VENTRICLE_CAVITY} fill="#161923" stroke="#96605d" strokeWidth="2" pointerEvents="none" />
-        <path d={LEFT_VENTRICLE_CAVITY} fill="#161923" stroke="#96605d" strokeWidth="2" pointerEvents="none" />
+        <path d={RIGHT_ATRIUM_CAVITY} fill="#101b2b" stroke="#a67b84" strokeWidth="2" pointerEvents="none" />
+        <path d={LEFT_ATRIUM_CAVITY} fill="#101b2b" stroke="#a67b84" strokeWidth="2" pointerEvents="none" />
+        <path d={RIGHT_VENTRICLE_CAVITY} fill="#101b2b" stroke="#a67b84" strokeWidth="2" pointerEvents="none" />
+        <path d={LEFT_VENTRICLE_CAVITY} fill="#101b2b" stroke="#a67b84" strokeWidth="2" pointerEvents="none" />
 
-        <path d={SEPTUM} fill={active === 'septum' ? '#075985' : '#293444'} stroke={active === 'septum' ? '#7dd3fc' : '#8491a3'} strokeWidth={active === 'septum' ? 4 : 2} {...interactive('septum')} />
+        <path d={SEPTUM} fill={active === 'septum' ? '#075985' : '#543940'} stroke={active === 'septum' ? '#7dd3fc' : '#a67b84'} strokeWidth={active === 'septum' ? 4 : 2} {...interactive('septum')} />
 
-        <path d={AV_BOUNDARY} fill="none" stroke={active === 'avInsulation' ? '#86efac' : '#cbd5e1'} strokeWidth="7" {...interactive('avInsulation')} />
+        <path d={AV_BOUNDARY} fill="none" stroke={active === 'avInsulation' ? '#86efac' : '#cbd5e1'} strokeWidth="4" strokeLinecap="round" {...interactive('avInsulation')} />
 
         <g {...interactive('sa')}>
           <circle cx={SA_NODE.x} cy={SA_NODE.y} r="15" fill="transparent" />
@@ -104,40 +101,26 @@ export default function TeachingAnatomyDiagram({ active, onSelect, onHover }) {
         </g>
 
         <g {...interactive('rbundle')}>
-          <path d="M197 204 C188 235 174 273 158 325" fill="none" strokeLinecap="round" {...pathwayStyle('rbundle')} />
-          <path d="M197 204 C188 235 174 273 158 325" fill="none" stroke="transparent" strokeWidth="18" />
+          <path d={RIGHT_BUNDLE} fill="none" strokeLinecap="round" {...pathwayStyle('rbundle')} />
+          <path d={RIGHT_BUNDLE} fill="none" stroke="transparent" strokeWidth="18" />
         </g>
         <g {...interactive('lbundle')}>
-          <path d="M197 204 C215 236 235 276 252 337" fill="none" strokeLinecap="round" {...pathwayStyle('lbundle')} />
-          <path d="M197 204 C215 236 235 276 252 337" fill="none" stroke="transparent" strokeWidth="18" />
+          <path d={LEFT_BUNDLE} fill="none" strokeLinecap="round" {...pathwayStyle('lbundle')} />
+          <path d={LEFT_BUNDLE} fill="none" stroke="transparent" strokeWidth="18" />
         </g>
 
         <g {...interactive('purkinje')} fill="none" strokeLinecap="round">
-          <path d="M158 325 C137 316 120 298 108 278 M158 325 C140 339 130 352 123 365 M158 325 C175 337 183 349 188 365" {...pathwayStyle('purkinje')} strokeWidth={active === 'purkinje' ? 5 : 3} />
-          <path d="M252 337 C272 319 280 299 283 278 M252 337 C272 348 280 359 283 372 M252 337 C232 350 220 363 211 378" {...pathwayStyle('purkinje')} strokeWidth={active === 'purkinje' ? 5 : 3} />
-          <path d="M158 325 C137 316 120 298 108 278 M158 325 C140 339 130 352 123 365 M158 325 C175 337 183 349 188 365 M252 337 C272 319 280 299 283 278 M252 337 C272 348 280 359 283 372 M252 337 C232 350 220 363 211 378" stroke="transparent" strokeWidth="18" />
+          <path d={RIGHT_PURKINJE} {...pathwayStyle('purkinje')} strokeWidth={active === 'purkinje' ? 5 : 3} />
+          <path d={LEFT_PURKINJE} {...pathwayStyle('purkinje')} strokeWidth={active === 'purkinje' ? 5 : 3} />
+          <path d={RIGHT_PURKINJE + ' ' + LEFT_PURKINJE} stroke="transparent" strokeWidth="18" />
         </g>
 
-        <g fill="#f3f4f6" fontFamily="system-ui, sans-serif" fontSize="12" fontWeight="600" pointerEvents="none">
-          <text x="16" y="20" fill="#cbd5e1">Patient's right ←</text>
-          <text x="268" y="42" fill="#cbd5e1">→ Patient's left</text>
-          <text x="74" y="82">SA node</text>
-          <text x="108" y="164">RA</text>
-          <text x="255" y="158">LA</text>
-          <text x="151" y="148">AV node</text>
-          <text x="205" y="195">His</text>
-          <text x="105" y="384">RV</text>
-          <text x="281" y="402">LV</text>
-          <text x="156" y="273" transform="rotate(-82 156 273)">R bundle</text>
-          <text x="229" y="267" transform="rotate(66 229 267)">L bundle</text>
-          <text x="214" y="370">Purkinje</text>
-          <text x="178" y="300" transform="rotate(80 178 300)">Septum</text>
-        </g>
+        <TeachingHeartLabels />
 
         {/* Muted level guides are orientation references, not conduction paths
             or precise anatomical planes. Only their side labels are interactive. */}
         <g fill="none" stroke="#64748b" strokeWidth="1" strokeDasharray="2 6" pointerEvents="none">
-          <path d="M76 213 H332" />
+          <path d="M76 214 H310" />
           <path d="M54 410 H332" />
         </g>
         <g fontFamily="system-ui, sans-serif" fontSize="12" fontWeight="600">
@@ -154,14 +137,12 @@ export default function TeachingAnatomyDiagram({ active, onSelect, onHover }) {
 
         <TransverseVentricularInset active={active} prefix="Anatomy diagram" />
       </svg>
-      <div className="absolute right-2 top-2 rounded-md border border-gray-600 bg-gray-950/90 px-2 py-1 text-xs font-semibold text-gray-200">
-        Select a structure for details
-      </div>
+
     </div>
   )
 }
 import {
-  HEART_VIEW_BOX,
+  HEART_VIEW_BOX, RIGHT_BUNDLE, LEFT_BUNDLE, RIGHT_PURKINJE, LEFT_PURKINJE,
   ATRIAL_MYOCARDIUM, ATRIAL_SEPTUM, BACHMANN_BUNDLE, AV_BOUNDARY, SA_NODE, AV_NODE, HIS_PATH,
   RIGHT_ATRIUM, LEFT_ATRIUM,
   RIGHT_ATRIUM_CAVITY,
@@ -172,4 +153,5 @@ import {
   LEFT_VENTRICLE_CAVITY,
   SEPTUM,
 } from '../lib/teachingHeartGeometry'
+import TeachingHeartLabels from './TeachingHeartLabels'
 import TransverseVentricularInset from './TransverseVentricularInset'

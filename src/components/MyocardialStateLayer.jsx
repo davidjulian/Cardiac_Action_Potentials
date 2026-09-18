@@ -15,9 +15,9 @@ function makeTissueMap() {
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')
   const regions = [
-    { id: 'rv', outer: RIGHT_VENTRICLE, inner: RIGHT_VENTRICLE_CAVITY, start: .50, end: .648, recovery: .68, recoveryEnd: .885 },
-    { id: 'lv', outer: LEFT_VENTRICLE, inner: LEFT_VENTRICLE_CAVITY, start: .50, end: .645, recovery: .66, recoveryEnd: .90 },
-    { id: 'septum', outer: SEPTUM, start: .49, end: .625, recovery: .715, recoveryEnd: .875 },
+    { id: 'rv', outer: RIGHT_VENTRICLE, inner: RIGHT_VENTRICLE_CAVITY, start: .49, end: .65, recovery: .66, recoveryEnd: .90 },
+    { id: 'lv', outer: LEFT_VENTRICLE, inner: LEFT_VENTRICLE_CAVITY, start: .49, end: .65, recovery: .66, recoveryEnd: .90 },
+    { id: 'septum', outer: SEPTUM, start: .49, end: .65, recovery: .66, recoveryEnd: .90 },
     { id: 'atria', outer: ATRIAL_MYOCARDIUM, start: .055, end: .21, recovery: .48, recoveryEnd: .66 },
   ].map(region => ({ ...region, wall: new Path2D(region.outer), cavity: region.inner ? new Path2D(region.inner) : null }))
   const gridWidth = WIDTH * SCALE
@@ -61,19 +61,17 @@ function makeTissueMap() {
           activation = arrival[py * gridWidth + px]
           recovery = activation
         } else {
-          const apexX = region.id === 'rv' ? 168 : region.id === 'lv' ? 249 : 197
-          const apexY = region.id === 'rv' ? 385 : region.id === 'lv' ? 400 : 370
-          // Broad curved progression through the connected walls; early septal
-          // activation is integrated, with no separate basal septal flash.
-          activation = Math.hypot(.8 * (x - apexX), y - apexY)
+          // One shared timing field avoids artificial seams where the drawn
+          // septum meets either wall. It depicts only the broad progression,
+          // not separate measured activation sites or regional velocities.
+          activation = Math.hypot(.65 * (x - 210), y - 385)
           // A separate basal timing field makes recovery progress broadly
           // toward the apex, not along the activation path. Curved contours
-          // and staggered chamber timing retain a schematic regional pattern.
+          // retain a deliberately schematic pattern.
           // This illustrates the base-before-apex LV pattern reported by
           // Sengupta et al. (2006), doi:10.1016/j.jacc.2005.08.073, in pigs;
           // it is not a measured or universal human recovery map.
-          const baseX = region.id === 'rv' ? 125 : region.id === 'lv' ? 245 : 191
-          recovery = Math.hypot(.65 * (x - baseX), y - 180)
+          recovery = Math.hypot(.45 * (x - 210), y - 214)
         }
         points[r].push({ offset: (py * WIDTH * SCALE + px) * 4, activation, recovery })
         break
@@ -81,11 +79,24 @@ function makeTissueMap() {
     }
   }
   const pixels = []
+  const ventricularExtents = { aMin: Infinity, aMax: -Infinity, rMin: Infinity, rMax: -Infinity }
+  regions.forEach((region, r) => {
+    if (region.id === 'atria') return
+    for (const p of points[r]) {
+      ventricularExtents.aMin = Math.min(ventricularExtents.aMin, p.activation)
+      ventricularExtents.aMax = Math.max(ventricularExtents.aMax, p.activation)
+      ventricularExtents.rMin = Math.min(ventricularExtents.rMin, p.recovery)
+      ventricularExtents.rMax = Math.max(ventricularExtents.rMax, p.recovery)
+    }
+  })
   regions.forEach((region, r) => {
     let aMin = Infinity, aMax = -Infinity, rMin = Infinity, rMax = -Infinity
     for (const p of points[r]) {
       aMin = Math.min(aMin, p.activation); aMax = Math.max(aMax, p.activation)
       rMin = Math.min(rMin, p.recovery); rMax = Math.max(rMax, p.recovery)
+    }
+    if (region.id !== 'atria') {
+      ;({ aMin, aMax, rMin, rMax } = ventricularExtents)
     }
     for (const p of points[r]) {
       pixels.push({
@@ -96,7 +107,7 @@ function makeTissueMap() {
             : .168 + .03 * (p.activation - avArrival) / (lastArrival - avArrival)
           : region.start + (region.end - region.start - .012) * (p.activation - aMin) / (aMax - aMin),
         recovery: region.recovery + (region.recoveryEnd - region.recovery - .025) * (p.recovery - rMin) / (rMax - rMin),
-        resting: region.id === 'lv' ? [91,48,50] : region.id === 'septum' ? [41,52,68] : [75,41,43],
+        resting: [84,57,64],
       })
     }
   })
