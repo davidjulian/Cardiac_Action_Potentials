@@ -28,12 +28,13 @@ function LabSidebar({ onOpenAbout }) {
       <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Laboratory sections">
         <div className="space-y-1">
           {tabInfo?.tabs.map(tab => {
-            const active = tab.id === tabInfo.active
+            const active = tab.id === tabInfo.active || tab.children?.some(child => child.id === tabInfo.active)
             const visited = tabInfo.visited?.has(tab.id)
             return (
+              <div key={tab.id}>
               <button
-                key={tab.id}
                 type="button"
+                aria-current={!tab.children && active ? 'page' : undefined}
                 onClick={() => tabInfo.setActive(tab.id)}
                 className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-colors ${
                   active
@@ -51,6 +52,28 @@ function LabSidebar({ onOpenAbout }) {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Visited" />
                 )}
               </button>
+              {tab.children && (
+                <div className="ml-6 my-1 space-y-1 border-l border-gray-700 pl-2" role="group" aria-label="Action potentials submodules">
+                  {tab.children.map(child => {
+                    const selected = child.id === tabInfo.active
+                    return (
+                      <button
+                        key={child.id}
+                        type="button"
+                        onClick={() => tabInfo.setActive(child.id)}
+                        aria-current={selected ? 'page' : undefined}
+                        className={`flex w-full items-center gap-2 rounded-lg border px-2 py-2.5 text-left text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 ${selected
+                          ? 'border-emerald-700 bg-emerald-950/60 text-emerald-200'
+                          : 'border-transparent text-gray-300 hover:bg-gray-800/70 hover:text-white'}`}
+                      >
+                        <span className="text-xs font-mono">{child.number}</span>
+                        <span>{child.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              </div>
             )
           })}
         </div>

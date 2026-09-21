@@ -1233,8 +1233,7 @@ function ConductionPathway({ selectedTissues }) {
   )
 }
 
-function LiveActionPotentials() {
-  const [lessonView, setLessonView] = useState('compare')
+function LiveActionPotentials({ lessonView }) {
   const [selectedTissues, setSelectedTissues] = useState(['sa', 'ventricle'])
   const [sympathetic, setSympathetic] = useState(20)
   const [parasympathetic, setParasympathetic] = useState(20)
@@ -1399,34 +1398,6 @@ function LiveActionPotentials() {
   )
   return (
     <div>
-      <div className="mb-2 flex flex-wrap gap-2" role="tablist" aria-label="Action potential learning stages">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={lessonView === 'compare'}
-          onClick={() => setLessonView('compare')}
-          className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
-            lessonView === 'compare'
-              ? 'border-emerald-700/60 bg-emerald-950/60 text-emerald-300'
-              : 'border-gray-700 bg-gray-900 text-gray-400 hover:text-gray-200'
-          }`}
-        >
-          1 · Compare cell types
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={lessonView === 'experiment'}
-          onClick={() => setLessonView('experiment')}
-          className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
-            lessonView === 'experiment'
-              ? 'border-emerald-700/60 bg-emerald-950/60 text-emerald-300'
-              : 'border-gray-700 bg-gray-900 text-gray-400 hover:text-gray-200'
-          }`}
-        >
-          2 · Run experiments
-        </button>
-      </div>
 
 
       <p className="mb-2 text-xs leading-relaxed text-gray-300">
@@ -2886,7 +2857,10 @@ function VectorCycle({ rhythm }) {
 const MODULE1_TABS = [
   // Keep storage IDs stable so returning students retain their selected module.
   { id: '1A', number: 1, label: '1 · Cardiac Anatomy', shortLabel: 'Cardiac anatomy' },
-  { id: '1B', number: 2, label: '2 · Action Potentials', shortLabel: 'Action potentials' },
+  { id: '1B', number: 2, label: '2 · Action Potentials', shortLabel: 'Action potentials', children: [
+    { id: '1B', number: '2.1', label: 'Compare cell types' },
+    { id: '1B-experiment', number: '2.2', label: 'Run experiments' },
+  ] },
   { id: '1C', number: 3, label: '3 · Conduction', shortLabel: 'Conduction' },
 ]
 
@@ -2902,7 +2876,9 @@ export default function CardiacBridge() {
 
   const [selected1A, setSelected1A] = useState(null)
 
-  const { active, visited, setActive } = useTabState('cardiac', MODULE1_TABS.map(t => t.id))
+  const { active, visited, setActive } = useTabState('cardiac', MODULE1_TABS.flatMap(t => t.children ? t.children.map(child => child.id) : [t.id]))
+  const activeModule = MODULE1_TABS.find(tab => tab.id === active || tab.children?.some(child => child.id === active))
+  const isExperiment = active === '1B-experiment'
   // Tabs now render as a sub-menu in the sidebar (see Sidebar.jsx) instead
   // of an in-page pill bar — this just publishes the same state there.
   usePublishTabs('cardiac', MODULE1_TABS, { active, visited, setActive })
@@ -2910,9 +2886,9 @@ export default function CardiacBridge() {
   return (
     <ModulePage
       moduleId="cardiac"
-      number={MODULE1_TABS.find(tab => tab.id === active)?.number}
+      number={activeModule?.number}
       title="Cardiac Action Potentials"
-      wide={active === '1B'}
+      wide={activeModule?.number === 2}
     >
       {active === '1A' && (
         <Section
@@ -2929,13 +2905,15 @@ export default function CardiacBridge() {
         </Section>
       )}
 
-      {active === '1B' && (
+      {activeModule?.number === 2 && (
         <Section
-          label="2"
-          title="Action Potentials by Cell Type"
-          subtitle="Compare action potential shapes, follow their activation sequence, and use channel contributions to predict how each cell will respond."
+          label={isExperiment ? '2.2' : '2.1'}
+          title={isExperiment ? 'Run experiments' : 'Compare cell types'}
+          subtitle={isExperiment
+            ? 'Manipulate autonomic tone and extracellular ions, then compare action potentials, calcium transients, and force with baseline conditions.'
+            : 'Compare action potential shapes, follow their activation sequence, and examine the contributions of different ion channels.'}
         >
-          <LiveActionPotentials />
+          <LiveActionPotentials lessonView={isExperiment ? 'experiment' : 'compare'} />
           <Callout>
             SA node and AV node use <strong>slow response</strong> action potentials (I_Ca,L upstroke, ~0.05 m/s).
             Atrial and ventricular myocytes use <strong>fast response</strong> action potentials (I_Na upstroke, 1 m/s).

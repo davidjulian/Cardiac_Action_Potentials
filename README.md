@@ -6,7 +6,11 @@ This focused version is derived from the PCB3713C ECG Learning Platform and cont
 
 - 1: cardiac anatomy
 - 2: action potentials by cell type
+  - 2.1: compare cell types
+  - 2.2: run experiments
 - 3: cardiac conduction
+
+Both Module 2 submodules remain visible in the sidebar. Selecting the Action potentials parent opens Compare cell types; Run experiments opens the manipulation controls and baseline comparisons directly.
 
 The app opens directly without authentication so students can keep it beside a Canvas New Quiz.
 
