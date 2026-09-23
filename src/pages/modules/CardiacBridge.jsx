@@ -3,6 +3,7 @@ import p5 from 'p5'
 import ModulePage from '../../components/ModulePage'
 import TeachingConductionAnimation from '../../components/TeachingConductionAnimation'
 import TeachingAnatomyDiagram from '../../components/TeachingAnatomyDiagram'
+import SACurrentExplorer from '../../components/SACurrentExplorer'
 import { getTeachingConductionStage } from '../../lib/teachingConduction'
 import { comparisonTimeDomain } from '../../lib/comparisonTimeDomain'
 import HeartAnimation from '../../components/HeartAnimation'
@@ -2860,6 +2861,7 @@ const MODULE1_TABS = [
   { id: '1B', number: 2, label: '2 · Action Potentials', shortLabel: 'Action potentials', children: [
     { id: '1B', number: '2.1', label: 'Compare cell types' },
     { id: '1B-experiment', number: '2.2', label: 'Run experiments' },
+    { id: '1B-currents', number: '2.3', label: 'Explore ionic currents' },
   ] },
   { id: '1C', number: 3, label: '3 · Conduction', shortLabel: 'Conduction' },
 ]
@@ -2875,6 +2877,9 @@ export default function CardiacBridge() {
   }, [])
 
   const [selected1A, setSelected1A] = useState(null)
+  const saCurrentWave = useMemo(() => buildSlowResponseWave(BASELINE_AP_PHYSIOLOGY.sa, {
+    n: 400, fireAtFrac: BASELINE_AP_PHYSIOLOGY.sa.phase4Frac,
+  }), [])
 
   const { active, visited, setActive } = useTabState('cardiac', MODULE1_TABS.flatMap(t => t.children ? t.children.map(child => child.id) : [t.id]))
   const activeModule = MODULE1_TABS.find(tab => tab.id === active || tab.children?.some(child => child.id === active))
@@ -2905,7 +2910,7 @@ export default function CardiacBridge() {
         </Section>
       )}
 
-      {activeModule?.number === 2 && (
+      {activeModule?.number === 2 && active !== '1B-currents' && (
         <Section
           label={isExperiment ? '2.2' : '2.1'}
           title={isExperiment ? 'Run experiments' : 'Compare cell types'}
@@ -2920,6 +2925,13 @@ export default function CardiacBridge() {
             Purkinje fibers have the fastest upstroke (highest dV/dt), longest plateau, and act as tertiary
             pacemakers (20–40 bpm) if SA and AV nodes both fail.
           </Callout>
+        </Section>
+      )}
+
+      {active === '1B-currents' && (
+        <Section label="2.3" title="Explore ionic currents — SA node"
+          subtitle="A qualitative prototype: connect the timing and direction of selected ionic currents with the action potential.">
+          <SACurrentExplorer wave={saCurrentWave} cycleMs={BASELINE_AP_PHYSIOLOGY.cycleMs} phase4End={BASELINE_AP_PHYSIOLOGY.sa.phase4Frac} />
         </Section>
       )}
 

@@ -8,9 +8,18 @@ This focused version is derived from the PCB3713C ECG Learning Platform and cont
 - 2: action potentials by cell type
   - 2.1: compare cell types
   - 2.2: run experiments
+  - 2.3: explore ionic currents (SA node prototype)
 - 3: cardiac conduction
 
-Both Module 2 submodules remain visible in the sidebar. Selecting the Action potentials parent opens Compare cell types; Run experiments opens the manipulation controls and baseline comparisons directly.
+All Module 2 submodules remain visible in the sidebar. Selecting the Action potentials parent opens Compare cell types; Run experiments opens the manipulation controls and baseline comparisons directly.
+
+## SA node current explorer
+
+Explore ionic currents pairs the baseline SA nodal action potential with separate schematic plots of I_f, I_Ca,T, I_Ca,L, and grouped delayed-rectifier I_K. All rows share time and a draggable cursor. The display starts paused and offers a 0.1× study rate and 1× real time.
+
+Current axes indicate inward, zero, and outward without numerical units. Each current is scaled independently: compare timing and direction, not amplitudes between rows. These illustrative envelopes are neither measured currents nor a biophysical model generating the displayed voltage. Channel gating and driving force both affect current; the curves do not represent channel open probability. Conditions are fixed, and omitted currents and calcium cycling are identified in the expandable scope note.
+
+Run the current envelope checks with `node --test src/lib/saCurrentExplorer.test.js`.
 
 The app opens directly without authentication so students can keep it beside a Canvas New Quiz.
 
