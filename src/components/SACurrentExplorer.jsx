@@ -26,6 +26,7 @@ function Plot({ data, fraction, phases, color, voltage = false, onScrub, label }
         onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); scrubFromPointer(event) }}
         onPointerMove={event => { if (event.buttons === 1) scrubFromPointer(event) }}>
         {phases.map(phase => <rect key={phase.id} x={phase.start * 1000} y="0" width={(phase.end - phase.start) * 1000} height="100" fill={phase.color} fillOpacity=".055" />)}
+        {!voltage && <path d={`${path} L${data.at(-1)[0] * 1000},50 L${data[0][0] * 1000},50 Z`} fill={color} />}
         {voltage
           ? [-60, -40, -20, 0, 20].map(v => <line key={v} x1="0" x2="1000" y1={y(v)} y2={y(v)} stroke="#334155" strokeWidth=".6" vectorEffect="non-scaling-stroke" />)
           : <line x1="0" x2="1000" y1="50" y2="50" stroke="#64748b" strokeWidth="1" vectorEffect="non-scaling-stroke" />}
