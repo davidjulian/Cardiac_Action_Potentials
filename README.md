@@ -5,21 +5,21 @@ An interactive teaching app for undergraduate biomedical engineering students st
 This focused version is derived from the PCB3713C ECG Learning Platform and contains only the sections used by the cardiac action potentials laboratory:
 
 - 1: cardiac anatomy
-- 2: action potentials by cell type
-  - 2.1: compare cell types
-  - 2.2: run experiments
-  - 2.3: explore ionic currents (SA node prototype)
-- 3: cardiac conduction
+- 2: cardiac conduction
+- 3: action potentials by cell type
+  - 3.1: compare cell types
+  - 3.2: run experiments
+  - 3.3: explore ionic currents
 
-All Module 2 submodules remain visible in the sidebar. Selecting the Action potentials parent opens Compare cell types; Run experiments opens the manipulation controls and baseline comparisons directly.
+All Module 3 submodules remain visible in the sidebar. Selecting the Action potentials parent opens Compare cell types; Run experiments opens the manipulation controls and baseline comparisons directly. Existing navigation storage IDs are retained so saved selections still work.
 
-## SA node current explorer
+## Ionic current explorer
 
-Explore ionic currents pairs the baseline SA nodal action potential with separate schematic plots of I_f, I_Ca,T, I_Ca,L, and grouped delayed-rectifier I_K. All rows share time and a draggable cursor. The display starts paused and offers a 0.1× study rate and 1× real time.
+Explore ionic currents displays one cell type at a time: SA node, atrial myocyte, AV node, Purkinje fiber, or ventricular myocyte. Nodal plots include I_f, I_Ca,T, I_Ca,L, and grouped delayed-rectifier I_K. Fast response plots include I_Na, I_Ca,L, I_to, I_Kr, I_Ks, and I_K1, plus atrial I_Kur or Purkinje I_f. All current plots are filled to zero and share time and a draggable cursor. Vm and controls remain visible while scrolling. Changing the cell type resets to a paused cycle; playback offers a 0.1× study rate and 1× real time.
 
-Current axes indicate inward, zero, and outward without numerical units. Each current is scaled independently: compare timing and direction, not amplitudes between rows. These illustrative envelopes are neither measured currents nor a biophysical model generating the displayed voltage. Channel gating and driving force both affect current; the curves do not represent channel open probability. Conditions are fixed, and omitted currents and calcium cycling are identified in the expandable scope note.
+Current axes indicate inward, zero, and outward without numerical units. Each current is scaled independently, including between cell types: compare timing and direction, not amplitudes. These illustrative envelopes are neither measured currents nor a biophysical model generating the displayed voltage. Channel gating and driving force both affect current; the curves do not represent channel open probability. Conditions are fixed, and omitted currents and calcium cycling are identified in the expandable scope note. Cell-specific notes distinguish sinus pacing from latent nodal/Purkinje automaticity. Timing is arranged for studying individual cells, not to show conduction delays.
 
-Run the current envelope checks with `node --test src/lib/saCurrentExplorer.test.js`.
+Run the current envelope checks with `node --test src/lib/saCurrentExplorer.test.js src/lib/currentExplorer.test.js`.
 
 The app opens directly without authentication so students can keep it beside a Canvas New Quiz.
 

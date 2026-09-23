@@ -3,7 +3,8 @@ import p5 from 'p5'
 import ModulePage from '../../components/ModulePage'
 import TeachingConductionAnimation from '../../components/TeachingConductionAnimation'
 import TeachingAnatomyDiagram from '../../components/TeachingAnatomyDiagram'
-import SACurrentExplorer from '../../components/SACurrentExplorer'
+import IonicCurrentExplorer from '../../components/IonicCurrentExplorer'
+import { createCurrentExplorerCells } from '../../lib/currentExplorer'
 import { getTeachingConductionStage } from '../../lib/teachingConduction'
 import { comparisonTimeDomain } from '../../lib/comparisonTimeDomain'
 import HeartAnimation from '../../components/HeartAnimation'
@@ -2858,12 +2859,12 @@ function VectorCycle({ rhythm }) {
 const MODULE1_TABS = [
   // Keep storage IDs stable so returning students retain their selected module.
   { id: '1A', number: 1, label: '1 · Cardiac Anatomy', shortLabel: 'Cardiac anatomy' },
-  { id: '1B', number: 2, label: '2 · Action Potentials', shortLabel: 'Action potentials', children: [
-    { id: '1B', number: '2.1', label: 'Compare cell types' },
-    { id: '1B-experiment', number: '2.2', label: 'Run experiments' },
-    { id: '1B-currents', number: '2.3', label: 'Explore ionic currents' },
+  { id: '1C', number: 2, label: '2 · Conduction', shortLabel: 'Conduction' },
+  { id: '1B', number: 3, label: '3 · Action Potentials', shortLabel: 'Action potentials', children: [
+    { id: '1B', number: '3.1', label: 'Compare cell types' },
+    { id: '1B-experiment', number: '3.2', label: 'Run experiments' },
+    { id: '1B-currents', number: '3.3', label: 'Explore ionic currents' },
   ] },
-  { id: '1C', number: 3, label: '3 · Conduction', shortLabel: 'Conduction' },
 ]
 
 // ── Main export ────────────────────────────────────────────────────────────
@@ -2877,8 +2878,16 @@ export default function CardiacBridge() {
   }, [])
 
   const [selected1A, setSelected1A] = useState(null)
-  const saCurrentWave = useMemo(() => buildSlowResponseWave(BASELINE_AP_PHYSIOLOGY.sa, {
-    n: 400, fireAtFrac: BASELINE_AP_PHYSIOLOGY.sa.phase4Frac,
+  const currentExplorerCells = useMemo(() => createCurrentExplorerCells({
+    sa: buildSlowResponseWave(BASELINE_AP_PHYSIOLOGY.sa, {
+      n: 1000, fireAtFrac: BASELINE_AP_PHYSIOLOGY.sa.phase4Frac,
+    }),
+    av: buildSlowResponseWave(BASELINE_AP_PHYSIOLOGY.av, {
+      n: 1000, fireAtFrac: BASELINE_AP_PHYSIOLOGY.av.phase4Frac, tissue: 'av',
+    }),
+    atrium: buildWorkingCellWave(BASELINE_AP_PHYSIOLOGY.atrium, 'atrium', 1000, .08),
+    purkinje: buildWorkingCellWave(BASELINE_AP_PHYSIOLOGY.purkinje, 'purkinje', 1000, .08),
+    ventricle: buildWorkingCellWave(BASELINE_AP_PHYSIOLOGY.ventricle, 'ventricle', 1000, .08),
   }), [])
 
   const { active, visited, setActive } = useTabState('cardiac', MODULE1_TABS.flatMap(t => t.children ? t.children.map(child => child.id) : [t.id]))
@@ -2893,7 +2902,7 @@ export default function CardiacBridge() {
       moduleId="cardiac"
       number={activeModule?.number}
       title="Cardiac Action Potentials"
-      wide={activeModule?.number === 2}
+      wide={activeModule?.number === 3}
     >
       {active === '1A' && (
         <Section
@@ -2910,9 +2919,9 @@ export default function CardiacBridge() {
         </Section>
       )}
 
-      {activeModule?.number === 2 && active !== '1B-currents' && (
+      {activeModule?.number === 3 && active !== '1B-currents' && (
         <Section
-          label={isExperiment ? '2.2' : '2.1'}
+          label={isExperiment ? '3.2' : '3.1'}
           title={isExperiment ? 'Run experiments' : 'Compare cell types'}
           subtitle={isExperiment
             ? 'Manipulate autonomic tone and extracellular ions, then compare action potentials, calcium transients, and force with baseline conditions.'
@@ -2929,15 +2938,15 @@ export default function CardiacBridge() {
       )}
 
       {active === '1B-currents' && (
-        <Section label="2.3" title="Explore ionic currents — SA node"
-          subtitle="A qualitative prototype: connect the timing and direction of selected ionic currents with the action potential.">
-          <SACurrentExplorer wave={saCurrentWave} cycleMs={BASELINE_AP_PHYSIOLOGY.cycleMs} phase4End={BASELINE_AP_PHYSIOLOGY.sa.phase4Frac} />
+        <Section label="3.3" title="Explore ionic currents"
+          subtitle="Select one cell type to connect the timing and direction of its ionic currents with its action potential.">
+          <IonicCurrentExplorer cells={currentExplorerCells} cycleMs={BASELINE_AP_PHYSIOLOGY.cycleMs} />
         </Section>
       )}
 
       {active === '1C' && (
         <Section
-          label="3"
+          label="2"
           title="Conduction Animation"
           subtitle="Follow a physiologically guided schematic of activation and recovery. Use the scrubber to examine each stage of the cardiac cycle."
         >
