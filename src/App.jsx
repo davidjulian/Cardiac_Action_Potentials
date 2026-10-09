@@ -121,7 +121,7 @@ function AboutModal({ onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="about-title"
-        className="w-full max-w-md rounded-2xl border border-gray-700 bg-gray-900 p-6 shadow-2xl"
+        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-gray-700 bg-gray-900 p-6 shadow-2xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -143,16 +143,26 @@ function AboutModal({ onClose }) {
           </button>
         </div>
 
-        <div className="mt-5 rounded-xl border border-emerald-900/70 bg-emerald-950/30 p-4">
-          <p className="text-sm font-medium text-gray-200">Primary developer</p>
-          <p className="mt-1 text-lg font-semibold text-emerald-300">Jacob Walker</p>
-          <p className="text-sm text-gray-300">UF Biomedical Engineering, Class of 2027</p>
-        </div>
-
-        <p className="mt-5 text-sm leading-relaxed text-gray-200">
-          This interactive teaching app supports exploration of cardiac anatomy,
-          action potentials, excitation contraction coupling, and conduction.
-        </p>
+        <dl className="mt-5 space-y-4 text-sm leading-relaxed text-gray-200">
+          <div>
+            <dt className="font-semibold text-gray-100">Original creator and primary developer</dt>
+            <dd className="mt-1">Jacob Walker, UF BME Class of 2027</dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-gray-100">Additional design and editing</dt>
+            <dd className="mt-1">David Julian, Ph.D.</dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-gray-100">Development assistance</dt>
+            <dd className="mt-1">Claude Code and OpenAI Codex</dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-gray-100">Contact</dt>
+            <dd className="mt-1">Jacob Walker: <a className="text-emerald-300 underline underline-offset-2" href="mailto:jacob.walker@ufl.edu">jacob.walker@ufl.edu</a></dd>
+            <dd className="mt-1">David Julian: <a className="text-emerald-300 underline underline-offset-2" href="mailto:djulian@ufl.edu">djulian@ufl.edu</a></dd>
+          </div>
+        </dl>
+        <p className="mt-5 border-t border-gray-700 pt-4 text-sm text-gray-200">© 2026 Jacob Walker and David Julian.</p>
       </section>
     </div>
   )
