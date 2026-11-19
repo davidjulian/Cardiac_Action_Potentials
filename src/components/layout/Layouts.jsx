@@ -6,7 +6,7 @@ import Sidebar from './Sidebar'
 export function LabLayout() {
   const { mode, loadingMode } = useMode()
   if (loadingMode) return null
-  // If they saved "free" mode last time, redirect them there
+  // Keep navigation consistent with the mode selected on this page.
   if (mode === 'free') return <Navigate to="/play/physics" replace />
 
   return (

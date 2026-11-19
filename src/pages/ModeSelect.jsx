@@ -74,7 +74,7 @@ export default function ModeSelect() {
             description="Work through all four modules sequentially. Each section unlocks the next, building from physics fundamentals to live ECG interpretation to patient diagnosis."
             features={[
               'Modules unlock as you progress',
-              'Progress is saved across sessions',
+              'Progress lasts until this page is reloaded',
               'Designed for first-time use in class',
               '"Mark complete" advances you forward',
             ]}

@@ -1,6 +1,4 @@
-﻿import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
-import { useAuth } from './AuthContext'
+﻿import { createContext, useContext, useState } from 'react'
 
 const ModeContext = createContext(null)
 
@@ -44,75 +42,13 @@ export const MODULE_INFO = {
 }
 
 export function ModeProvider({ children }) {
-  const { user } = useAuth()
+  // Retained legacy mode components use page-local state without an account.
+  const [mode, setMode] = useState(null)
+  const [progress, setProgress] = useState(new Set())
+  const loadingMode = false
 
-  // 'lab' | 'free' | null (null = not chosen yet)
-  const [mode, setModeState]       = useState(null)
-  // Set of module IDs the student has completed (e.g. new Set(['physics', 'cardiac']))
-  const [progress, setProgress]    = useState(new Set())
-  const [loadingMode, setLoading]  = useState(true)
-
-  // When the user logs in/out, load their saved mode and progress from Supabase.
-  // Keyed on user?.id (a stable primitive) rather than the user object itself —
-  // Supabase hands us a freshly-deserialized user object on every auth event
-  // (e.g. token refresh on tab focus), so keying on the object would re-run
-  // this fetch — and its 2 queries — on every one of those, not just real logins.
-  useEffect(() => {
-    if (!user) {
-      setModeState(null)
-      setProgress(new Set())
-      setLoading(false)
-      return
-    }
-
-    const load = async () => {
-      setLoading(true)
-      try {
-        // Load mode preference
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('mode')
-          .eq('id', user.id)
-          .single()
-        if (profile?.mode) setModeState(profile.mode)
-
-        // Load completed modules
-        const { data: rows } = await supabase
-          .from('user_progress')
-          .select('module_id')
-          .eq('user_id', user.id)
-          .eq('completed', true)
-        if (rows) setProgress(new Set(rows.map(r => r.module_id)))
-      } catch (err) {
-        console.error('Failed to load user data:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    load()
-  }, [user?.id])
-
-  // Change mode (lab ↔ free) and persist to Supabase
-  const setMode = async (newMode) => {
-    setModeState(newMode)
-    if (user) {
-      await supabase
-        .from('profiles')
-        .update({ mode: newMode })
-        .eq('id', user.id)
-    }
-  }
-
-  // Mark a module complete — updates local state immediately, syncs to Supabase
-  const markComplete = async (moduleId) => {
+  const markComplete = (moduleId) => {
     setProgress(prev => new Set([...prev, moduleId]))
-    if (user) {
-      await supabase.from('user_progress').upsert(
-        { user_id: user.id, module_id: moduleId, completed: true, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id,module_id' }
-      )
-    }
   }
 
   // A module is "unlocked" in Lab Mode if every preceding module is completed.
