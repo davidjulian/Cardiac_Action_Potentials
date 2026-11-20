@@ -2901,7 +2901,7 @@ export default function CardiacBridge() {
     <ModulePage
       moduleId="cardiac"
       number={activeModule?.number}
-      title="Cardiac Action Potentials"
+      title="Cardiac Action Potentials Lab"
       wide={activeModule?.number === 3}
     >
       {active === '1A' && (
