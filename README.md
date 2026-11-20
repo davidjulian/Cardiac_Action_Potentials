@@ -23,6 +23,11 @@ Run the current envelope checks with `node --test src/lib/saCurrentExplorer.test
 
 The app opens directly without authentication so students can keep it beside a Canvas New Quiz.
 
+The obsolete account and backend integration has been removed. No Supabase project,
+database, or environment variables are required. Retained legacy mode and scenario
+components keep their progress and scores in memory only; reloading clears that state.
+The focused lab's existing browser navigation storage is unchanged.
+
 ## New excitation contraction displays
 
 Atrial and ventricular panels show three synchronized teaching traces:

@@ -1,6 +1,4 @@
 ﻿import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { useAuth } from '../../context/AuthContext'
-import { supabase } from '../../lib/supabase'
 import ModulePage from '../../components/ModulePage'
 import {
   RHYTHMS, RHYTHM_PRESETS, complexWaves,
@@ -878,41 +876,15 @@ function ProgressDashboard({ scores, onSelectCase, activeId }) {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function PatientScenarios() {
-  const { user }                  = useAuth()
-  const [activeId, setActiveId]   = useState('case1')
-  const [scores, setScores]       = useState({})
-  const [saving, setSaving]       = useState(false)
+  const [activeId, setActiveId] = useState('case1')
+  // Scores are kept for this page only; there is no account or backend sync.
+  const [scores, setScores] = useState({})
 
-  useEffect(() => {
-    if (!user) return
-    supabase
-      .from('scenario_scores')
-      .select('case_id, score, max_score')
-      .eq('user_id', user.id)
-      .then(({ data }) => {
-        if (!data) return
-        const map = {}
-        data.forEach(row => { map[row.case_id] = { score: row.score, max: row.max_score } })
-        setScores(map)
-      })
-  }, [user])
-
-  const handleSubmit = useCallback(async (caseId, answers, score) => {
+  const handleSubmit = useCallback((caseId, score) => {
     const caseData = CASES.find(c => c.id === caseId)
-    const max      = caseData?.questions.length ?? 5
+    const max = caseData?.questions.length ?? 5
     setScores(prev => ({ ...prev, [caseId]: { score, max } }))
-    if (!user) return
-    setSaving(true)
-    await supabase.from('scenario_scores').upsert({
-      user_id:      user.id,
-      case_id:      caseId,
-      score,
-      max_score:    max,
-      answers,
-      submitted_at: new Date().toISOString(),
-    }, { onConflict: 'user_id,case_id' })
-    setSaving(false)
-  }, [user])
+  }, [])
 
   const activeCase = CASES.find(c => c.id === activeId)
 
@@ -941,13 +913,12 @@ export default function PatientScenarios() {
             </p>
           )}
         </div>
-        {saving && <span className="text-xs text-gray-500 italic">Saving score…</span>}
       </div>
 
       <ScenarioCard
         key={activeId}
         caseData={activeCase}
-        onSubmit={(answers, score) => handleSubmit(activeId, answers, score)}
+        onSubmit={(_answers, score) => handleSubmit(activeId, score)}
       />
     </ModulePage>
   )

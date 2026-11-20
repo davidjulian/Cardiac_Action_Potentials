@@ -18,7 +18,7 @@ function LabSidebar({ onOpenAbout }) {
               strokeLinejoin="round"
             />
           </svg>
-          <span className="text-gray-100 text-sm font-semibold">Cardiac AP Lab</span>
+          <span className="text-gray-100 text-sm font-semibold">Cardiac Action Potentials Lab</span>
         </div>
         <p className="text-sm text-gray-300 leading-relaxed">
           Intracellular electrophysiology, excitation contraction coupling, and conduction
